@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smile Suite — Multi-Branch Dental Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#0A1F26;
+  --navy-2:#0F2C34;
+  --navy-3:#15414C;
+  --mint:#2FE6C4;
+  --mint-dim:#1FAE93;
+  --coral:#FF6B5E;
+  --amber:#FFB648;
+  --bg:#F2F6F5;
+  --card:#FFFFFF;
+  --ink:#0B2228;
+  --muted:#5E7C7C;
+  --line:#E2EAE8;
+  --radius:16px;
+  --ease:cubic-bezier(.22,.9,.32,1);
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+html{scroll-behavior:smooth;}
+body{
+  font-family:'Inter',sans-serif;
+  background:var(--bg);
+  color:var(--ink);
+  display:flex;
+  min-height:100vh;
+  overflow-x:hidden;
+}
+@media (prefers-reduced-motion: reduce){
+  *{animation-duration:0.01ms !important; transition-duration:0.01ms !important;}
+}
+
+/* ===== SIDEBAR ===== */
+.sidebar{
+  width:286px;
+  flex-shrink:0;
+  background:linear-gradient(180deg,var(--navy) 0%, var(--navy-2) 100%);
+  color:#CFE6E2;
+  height:100vh;
+  position:sticky;
+  top:0;
+  display:flex;
+  flex-direction:column;
+  border-right:1px solid rgba(255,255,255,0.06);
+  transition:width .35s var(--ease);
+  z-index:50;
+}
+.sidebar.collapsed{ width:84px; }
+
+.brand{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:24px 22px;
+  border-bottom:1px solid rgba(255,255,255,0.07);
+  white-space:nowrap;
+}
+.tooth-mark{
+  width:38px; height:38px; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  position:relative;
+}
+.tooth-mark svg{ width:30px; height:30px; }
+.tooth-mark .pulse{
+  position:absolute; inset:-4px; border-radius:50%;
+  border:1.5px solid var(--mint);
+  opacity:0;
+  animation:pulseRing 3s var(--ease) infinite;
+}
+@keyframes pulseRing{
+  0%{ transform:scale(.7); opacity:.55;}
+  70%{ transform:scale(1.25); opacity:0;}
+  100%{opacity:0;}
+}
+.brand-text{ overflow:hidden; transition:opacity .25s var(--ease), width .25s var(--ease);}
+.sidebar.collapsed .brand-text{ width:0; opacity:0;}
+.brand-text .name{ font-family:'Outfit',sans-serif; font-weight:700; font-size:18px; color:#fff; letter-spacing:.2px;}
+.brand-text .sub{ font-size:11px; color:var(--mint); font-family:'JetBrains Mono',monospace; letter-spacing:.5px; margin-top:2px;}
+
+.branch-pill{
+  margin:14px 18px 4px;
+  padding:9px 12px;
+  background:rgba(47,230,196,0.08);
+  border:1px solid rgba(47,230,196,0.25);
+  border-radius:10px;
+  font-size:11.5px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  cursor:pointer;
+  transition:background .2s var(--ease);
+  white-space:nowrap;
+  overflow:hidden;
+}
+.branch-pill:hover{ background:rgba(47,230,196,0.15);}
+.sidebar.collapsed .branch-pill{ display:none; }
+.branch-pill .dot{ width:7px;height:7px;border-radius:50%; background:var(--mint); box-shadow:0 0 0 3px rgba(47,230,196,.18); margin-right:6px;}
+.branch-pill span.lbl{ display:flex; align-items:center; color:#AFE0D6;}
+.branch-pill .chev{ color:var(--muted); font-size:10px;}
+
+.nav-scroll{
+  flex:1;
+  overflow-y:auto;
+  overflow-x:hidden;
+  padding:10px 12px 18px;
+}
+.nav-scroll::-webkit-scrollbar{width:5px;}
+.nav-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.12); border-radius:10px;}
+
+.nav-group{ margin-bottom:2px; }
+.nav-head{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:11px 12px;
+  border-radius:11px;
+  cursor:pointer;
+  font-size:13.5px;
+  font-weight:500;
+  color:#B9D4D0;
+  position:relative;
+  transition:background .2s var(--ease), color .2s var(--ease);
+  white-space:nowrap;
+}
+.nav-head:hover{ background:rgba(255,255,255,0.05); color:#fff; }
+.nav-head .ic{
+  width:20px; height:20px; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  font-size:15px;
+}
+.nav-head .lbl{ flex:1; overflow:hidden; text-overflow:ellipsis; transition:opacity .2s var(--ease);}
+.sidebar.collapsed .nav-head .lbl,
+.sidebar.collapsed .nav-head .chev,
+.sidebar.collapsed .nav-head .count{ opacity:0; width:0; }
+.nav-head .chev{
+  font-size:10px; color:var(--muted); transition:transform .3s var(--ease);
+}
+.nav-group.open > .nav-head .chev{ transform:rotate(90deg); color:var(--mint);}
+.nav-group.active > .nav-head{ background:rgba(47,230,196,0.1); color:#fff; }
+.nav-group.active > .nav-head::before{
+  content:'';
+  position:absolute; left:-12px; top:50%; transform:translateY(-50%);
+  width:3px; height:60%; border-radius:3px;
+  background:var(--mint);
+  box-shadow:0 0 10px rgba(47,230,196,.7);
+}
+
+.sub-list{
+  max-height:0;
+  overflow:hidden;
+  transition:max-height .4s var(--ease);
+  padding-left:14px;
+  border-left:1px dashed rgba(255,255,255,0.1);
+  margin-left:21px;
+}
+.nav-group.open > .sub-list{ max-height:500px; }
+.sidebar.collapsed .sub-list{ display:none; }
+.sub-item{
+  display:flex;
+  align-items:center;
+  gap:9px;
+  padding:8.5px 12px;
+  font-size:12.8px;
+  color:#9FBFBB;
+  border-radius:8px;
+  cursor:pointer;
+  transition:all .18s var(--ease);
+  position:relative;
+}
+.sub-item::before{
+  content:'';
+  width:4px; height:4px; border-radius:50%;
+  background:#4A6B68;
+  transition:all .18s var(--ease);
+  flex-shrink:0;
+}
+.sub-item:hover{ color:#fff; background:rgba(255,255,255,0.04); transform:translateX(2px);}
+.sub-item:hover::before{ background:var(--mint); box-shadow:0 0 6px var(--mint);}
+.sub-item.current{ color:var(--mint); font-weight:600; background:rgba(47,230,196,0.08);}
+.sub-item.current::before{ background:var(--mint); box-shadow:0 0 6px var(--mint);}
+
+.sidebar-foot{
+  padding:14px;
+  border-top:1px solid rgba(255,255,255,0.07);
+}
+.collapse-btn{
+  width:100%;
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  background:rgba(255,255,255,0.05);
+  border:1px solid rgba(255,255,255,0.08);
+  color:#9FBFBB;
+  padding:9px;
+  border-radius:10px;
+  cursor:pointer;
+  font-size:12px;
+  transition:all .2s var(--ease);
+}
+.collapse-btn:hover{ background:rgba(47,230,196,0.12); color:var(--mint); border-color:rgba(47,230,196,.3);}
+.collapse-btn .arrow{ transition:transform .35s var(--ease); }
+.sidebar.collapsed .collapse-btn .arrow{ transform:rotate(180deg); }
+.sidebar.collapsed .collapse-btn .txt{ display:none; }
+
+/* ===== MAIN ===== */
+.main{ flex:1; min-width:0; display:flex; flex-direction:column; }
+
+.topbar{
+  height:72px;
+  background:var(--card);
+  border-bottom:1px solid var(--line);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:0 28px;
+  position:sticky; top:0; z-index:30;
+}
+.topbar .title-block .eyebrow{
+  font-family:'JetBrains Mono',monospace;
+  font-size:10.5px; letter-spacing:1.2px; color:var(--mint-dim); text-transform:uppercase;
+}
+.topbar .title-block h1{ font-family:'Outfit',sans-serif; font-size:21px; font-weight:700; margin-top:2px;}
+.topbar-right{ display:flex; align-items:center; gap:18px; }
+.search-box{
+  display:flex; align-items:center; gap:8px;
+  background:var(--bg); border:1px solid var(--line);
+  padding:9px 14px; border-radius:10px; width:260px;
+  transition:border-color .2s var(--ease), box-shadow .2s var(--ease);
+}
+.search-box:focus-within{ border-color:var(--mint); box-shadow:0 0 0 3px rgba(47,230,196,.15);}
+.search-box input{ border:none; background:transparent; outline:none; font-size:13px; width:100%; color:var(--ink);}
+.icon-btn{
+  width:38px; height:38px; border-radius:10px;
+  display:flex; align-items:center; justify-content:center;
+  background:var(--bg); border:1px solid var(--line);
+  cursor:pointer; position:relative; font-size:16px;
+  transition:all .2s var(--ease);
+}
+.icon-btn:hover{ background:#fff; border-color:var(--mint); transform:translateY(-1px); box-shadow:0 4px 10px rgba(15,44,52,.08);}
+.icon-btn .badge{
+  position:absolute; top:-3px; right:-3px;
+  width:16px; height:16px; border-radius:50%;
+  background:var(--coral); color:#fff; font-size:9px;
+  display:flex; align-items:center; justify-content:center; font-weight:700;
+  border:2px solid var(--card);
+}
+.avatar{
+  width:40px; height:40px; border-radius:12px;
+  background:linear-gradient(135deg,var(--mint),var(--mint-dim));
+  display:flex; align-items:center; justify-content:center;
+  color:var(--navy); font-weight:700; font-size:14px; cursor:pointer;
+  transition:transform .2s var(--ease);
+}
+.avatar:hover{ transform:scale(1.06) rotate(-2deg); }
+
+.content{ padding:28px; flex:1; }
+.content-section{ display:none; animation:fadeUp .45s var(--ease); }
+.content-section.active{ display:block; }
+@keyframes fadeUp{
+  from{ opacity:0; transform:translateY(14px);}
+  to{ opacity:1; transform:translateY(0);}
+}
+
+.section-head{ margin-bottom:22px; }
+.section-head h2{ font-family:'Outfit',sans-serif; font-size:24px; font-weight:700;}
+.section-head p{ color:var(--muted); font-size:13.5px; margin-top:4px;}
+
+/* Stat cards */
+.stat-grid{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:18px;
+  margin-bottom:24px;
+}
+.stat-card{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  padding:20px;
+  position:relative;
+  overflow:hidden;
+  transition:transform .3s var(--ease), box-shadow .3s var(--ease);
+  opacity:0; transform:translateY(16px);
+  animation:cardIn .55s var(--ease) forwards;
+}
+.stat-card:nth-child(1){animation-delay:.05s;}
+.stat-card:nth-child(2){animation-delay:.12s;}
+.stat-card:nth-child(3){animation-delay:.19s;}
+.stat-card:nth-child(4){animation-delay:.26s;}
+@keyframes cardIn{ to{opacity:1; transform:translateY(0);} }
+.stat-card:hover{ transform:translateY(-4px); box-shadow:0 14px 28px rgba(15,44,52,.1); border-color:transparent;}
+.stat-card .top-row{ display:flex; justify-content:space-between; align-items:flex-start;}
+.stat-card .ic{
+  width:42px; height:42px; border-radius:11px;
+  display:flex; align-items:center; justify-content:center; font-size:19px;
+}
+.stat-card .trend{ font-size:11.5px; font-weight:700; padding:4px 8px; border-radius:7px; }
+.trend.up{ color:#0D9488; background:#E3FBF6;}
+.trend.down{ color:var(--coral); background:#FFEDEB;}
+.stat-card .num{ font-family:'Outfit',sans-serif; font-size:30px; font-weight:800; margin-top:14px;}
+.stat-card .lbl{ font-size:12.5px; color:var(--muted); margin-top:2px;}
+.stat-card .spark{ display:flex; align-items:flex-end; gap:3px; height:26px; margin-top:14px; }
+.stat-card .spark i{ flex:1; background:linear-gradient(180deg,var(--mint),var(--mint-dim)); border-radius:2px; opacity:.85; transform-origin:bottom; animation:bar 1s var(--ease) forwards; transform:scaleY(0); }
+@keyframes bar{ to{ transform:scaleY(1);} }
+
+/* Two column layout */
+.grid-2{ display:grid; grid-template-columns:1.5fr 1fr; gap:18px; margin-bottom:18px; }
+.panel{
+  background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+  padding:22px;
+  opacity:0; transform:translateY(16px); animation:cardIn .55s var(--ease) forwards; animation-delay:.3s;
+}
+.panel-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;}
+.panel-head h3{ font-family:'Outfit',sans-serif; font-size:16px; font-weight:700;}
+.link-btn{ font-size:12.5px; color:var(--mint-dim); font-weight:600; cursor:pointer; }
+
+.row-item{
+  display:flex; align-items:center; gap:12px;
+  padding:12px 10px; border-radius:10px;
+  transition:background .2s var(--ease);
+  cursor:pointer;
+}
+.row-item:hover{ background:var(--bg); }
+.row-item .av{
+  width:38px; height:38px; border-radius:50%;
+  background:var(--navy-3); color:var(--mint);
+  display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px; flex-shrink:0;
+}
+.row-item .info{ flex:1; min-width:0; }
+.row-item .info .nm{ font-size:13.5px; font-weight:600; }
+.row-item .info .sub{ font-size:11.5px; color:var(--muted); }
+.row-item .time{ font-size:11.5px; font-weight:600; color:var(--navy-3); background:var(--bg); padding:4px 9px; border-radius:7px; }
+.status-dot{ width:7px; height:7px; border-radius:50%; }
+.status-dot.green{ background:#1FAE93; box-shadow:0 0 0 4px rgba(31,174,147,.15);}
+.status-dot.amber{ background:var(--amber); box-shadow:0 0 0 4px rgba(255,182,72,.15);}
+
+.toothmap{
+  display:grid; grid-template-columns:repeat(8,1fr); gap:8px; margin-top:6px;
+}
+.tooth{
+  aspect-ratio:1; border-radius:8px; background:var(--bg); border:1px solid var(--line);
+  display:flex; align-items:center; justify-content:center; font-size:10px; color:var(--muted);
+  cursor:pointer; transition:all .2s var(--ease);
+}
+.tooth:hover{ transform:translateY(-3px); }
+.tooth.healthy:hover{ background:#E3FBF6; border-color:var(--mint);}
+.tooth.treated{ background:#E3FBF6; border-color:var(--mint-dim); color:var(--mint-dim); font-weight:700;}
+.tooth.attention{ background:#FFEDEB; border-color:var(--coral); color:var(--coral); font-weight:700;}
+
+.branch-bar-list .b-row{ margin-bottom:14px; }
+.b-row .b-top{ display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:6px;}
+.b-row .b-top span:first-child{ font-weight:600;}
+.b-row .b-top span:last-child{ color:var(--muted); }
+.bar-track{ height:8px; background:var(--bg); border-radius:6px; overflow:hidden; }
+.bar-fill{ height:100%; border-radius:6px; background:linear-gradient(90deg,var(--mint-dim),var(--mint)); width:0; transition:width 1.1s var(--ease); }
+
+/* generic placeholder section */
+.placeholder-card{
+  background:var(--card); border:1px dashed var(--line); border-radius:var(--radius);
+  padding:60px 28px; text-align:center; color:var(--muted);
+  opacity:0; transform:translateY(10px); animation:cardIn .5s var(--ease) forwards;
+}
+.placeholder-card .icon-big{ font-size:38px; margin-bottom:14px; }
+.placeholder-card h3{ font-family:'Outfit',sans-serif; color:var(--ink); font-size:18px; margin-bottom:6px;}
+.placeholder-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+.mini-action{
+  background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px;
+  display:flex; gap:12px; align-items:flex-start; cursor:pointer;
+  transition:all .25s var(--ease);
+  opacity:0; transform:translateY(12px); animation:cardIn .5s var(--ease) forwards;
+}
+.mini-action:hover{ border-color:var(--mint); transform:translateY(-3px); box-shadow:0 10px 22px rgba(15,44,52,.08);}
+.mini-action .mi-ic{ width:38px;height:38px; border-radius:10px; background:var(--bg); display:flex; align-items:center; justify-content:center; font-size:17px; flex-shrink:0;}
+.mini-action .mi-t{ font-size:13.5px; font-weight:700; }
+.mini-action .mi-d{ font-size:11.5px; color:var(--muted); margin-top:3px; }
+
+@media (max-width:980px){
+  .stat-grid{ grid-template-columns:repeat(2,1fr);}
+  .grid-2{ grid-template-columns:1fr; }
+  .placeholder-grid{ grid-template-columns:1fr; }
+  .search-box{ display:none; }
+}
+</style>
+</head>
+<body>
+
+<!-- ================= SIDEBAR ================= -->
+<aside class="sidebar" id="sidebar">
+  <div class="brand">
+    <div class="tooth-mark">
+      <span class="pulse"></span>
+      <svg viewBox="0 0 24 24" fill="none">
+        <path d="M12 2C9.5 2 8 3.2 6.5 3.2C4.5 3.2 3 5 3 7.8C3 10.5 4 13 4.6 16C5.1 18.5 5.6 21 7.2 21C8.7 21 8.8 18 9.5 15.5C10 13.7 10.6 12.5 12 12.5C13.4 12.5 14 13.7 14.5 15.5C15.2 18 15.3 21 16.8 21C18.4 21 18.9 18.5 19.4 16C20 13 21 10.5 21 7.8C21 5 19.5 3.2 17.5 3.2C16 3.2 14.5 2 12 2Z" fill="#2FE6C4"/>
+      </svg>
+    </div>
+    <div class="brand-text">
+      <div class="name">Smile Suite</div>
+      <div class="sub">CLINIC OS · v3.2</div>
+    </div>
+  </div>
+
+  <div class="branch-pill" title="Switch branch">
+    <span class="lbl"><span class="dot"></span>Chennai · Adyar Branch</span>
+    <span class="chev">▾</span>
+  </div>
+
+  <nav class="nav-scroll" id="navScroll"></nav>
+
+  <div class="sidebar-foot">
+    <div class="collapse-btn" id="collapseBtn">
+      <span class="arrow">⟨⟨</span><span class="txt">Collapse</span>
+    </div>
+  </div>
+</aside>
+
+<!-- ================= MAIN ================= -->
+<div class="main">
+  <header class="topbar">
+    <div class="title-block">
+      <div class="eyebrow" id="crumbEyebrow">OVERVIEW</div>
+      <h1 id="pageTitle">Dashboard</h1>
+    </div>
+    <div class="topbar-right">
+      <div class="search-box">
+        <span>🔍</span>
+        <input type="text" placeholder="Search patients, doctors, invoices...">
+      </div>
+      <div class="icon-btn">🔔<span class="badge">6</span></div>
+      <div class="icon-btn">✉️<span class="badge">2</span></div>
+      <div class="avatar">PR</div>
+    </div>
+  </header>
+
+  <main class="content">
+
+    <!-- DASHBOARD -->
+    <section class="content-section active" id="sec-dashboard">
+      <div class="section-head">
+        <h2>Good evening, Prabhu 👋</h2>
+        <p>Here's what's happening across all branches today, June 30 2026.</p>
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="top-row">
+            <div class="ic" style="background:#E3FBF6;">📅</div>
+            <span class="trend up">▲ 12%</span>
+          </div>
+          <div class="num" data-count="48">0</div>
+          <div class="lbl">Today's Appointments</div>
+          <div class="spark">
+            <i style="height:40%;animation-delay:.1s"></i><i style="height:70%;animation-delay:.15s"></i>
+            <i style="height:55%;animation-delay:.2s"></i><i style="height:90%;animation-delay:.25s"></i>
+            <i style="height:65%;animation-delay:.3s"></i><i style="height:100%;animation-delay:.35s"></i>
+            <i style="height:80%;animation-delay:.4s"></i>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="top-row">
+            <div class="ic" style="background:#FFF3E3;">💳</div>
+            <span class="trend up">▲ 8.4%</span>
+          </div>
+          <div class="num" data-prefix="₹" data-count="186400">0</div>
+          <div class="lbl">Revenue Today (4 branches)</div>
+          <div class="spark">
+            <i style="height:50%;animation-delay:.1s"></i><i style="height:60%;animation-delay:.15s"></i>
+            <i style="height:45%;animation-delay:.2s"></i><i style="height:75%;animation-delay:.25s"></i>
+            <i style="height:95%;animation-delay:.3s"></i><i style="height:70%;animation-delay:.35s"></i>
+            <i style="height:88%;animation-delay:.4s"></i>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="top-row">
+            <div class="ic" style="background:#EAE8FF;">🦷</div>
+            <span class="trend up">▲ 4</span>
+          </div>
+          <div class="num" data-count="23">0</div>
+          <div class="lbl">Pending Treatments</div>
+          <div class="spark">
+            <i style="height:60%;animation-delay:.1s"></i><i style="height:40%;animation-delay:.15s"></i>
+            <i style="height:80%;animation-delay:.2s"></i><i style="height:35%;animation-delay:.25s"></i>
+            <i style="height:65%;animation-delay:.3s"></i><i style="height:50%;animation-delay:.35s"></i>
+            <i style="height:72%;animation-delay:.4s"></i>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="top-row">
+            <div class="ic" style="background:#FFEDEB;">⚠️</div>
+            <span class="trend down">▼ 2</span>
+          </div>
+          <div class="num" data-count="7">0</div>
+          <div class="lbl">Low Stock Alerts</div>
+          <div class="spark">
+            <i style="height:30%;animation-delay:.1s"></i><i style="height:55%;animation-delay:.15s"></i>
+            <i style="height:20%;animation-delay:.2s"></i><i style="height:45%;animation-delay:.25s"></i>
+            <i style="height:25%;animation-delay:.3s"></i><i style="height:38%;animation-delay:.35s"></i>
+            <i style="height:22%;animation-delay:.4s"></i>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="panel">
+          <div class="panel-head">
+            <h3>Today's Appointments</h3>
+            <span class="link-btn">View calendar →</span>
+          </div>
+          <div class="row-item">
+            <div class="av">RK</div>
+            <div class="info"><div class="nm">Ravi Kumar — Root Canal (Tooth #36)</div><div class="sub">Dr. Anitha Suresh · Adyar Branch</div></div>
+            <span class="status-dot green"></span>
+            <div class="time">10:30 AM</div>
+          </div>
+          <div class="row-item">
+            <div class="av">SM</div>
+            <div class="info"><div class="nm">Sara Mathew — Scaling & Polishing</div><div class="sub">Dr. Vivek Iyer · Velachery Branch</div></div>
+            <span class="status-dot green"></span>
+            <div class="time">11:00 AM</div>
+          </div>
+          <div class="row-item">
+            <div class="av">JP</div>
+            <div class="info"><div class="nm">Joseph Paul — Crown Fitting</div><div class="sub">Dr. Anitha Suresh · Adyar Branch</div></div>
+            <span class="status-dot amber"></span>
+            <div class="time">12:15 PM</div>
+          </div>
+          <div class="row-item">
+            <div class="av">NT</div>
+            <div class="info"><div class="nm">Nila Thomas — Consultation</div><div class="sub">Dr. Faisal Rahman · OMR Branch</div></div>
+            <span class="status-dot green"></span>
+            <div class="time">2:00 PM</div>
+          </div>
+          <div class="row-item">
+            <div class="av">AK</div>
+            <div class="info"><div class="nm">Arjun K — Braces Adjustment</div><div class="sub">Dr. Vivek Iyer · Velachery Branch</div></div>
+            <span class="status-dot amber"></span>
+            <div class="time">3:45 PM</div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h3>Branch-wise Today</h3>
+            <span class="link-btn">All branches →</span>
+          </div>
+          <div class="branch-bar-list">
+            <div class="b-row">
+              <div class="b-top"><span>Adyar HQ</span><span>18 appts · ₹64,200</span></div>
+              <div class="bar-track"><div class="bar-fill" data-w="88%"></div></div>
+            </div>
+            <div class="b-row">
+              <div class="b-top"><span>Velachery</span><span>14 appts · ₹51,000</span></div>
+              <div class="bar-track"><div class="bar-fill" data-w="70%"></div></div>
+            </div>
+            <div class="b-row">
+              <div class="b-top"><span>OMR</span><span>9 appts · ₹38,700</span></div>
+              <div class="bar-track"><div class="bar-fill" data-w="52%"></div></div>
+            </div>
+            <div class="b-row">
+              <div class="b-top"><span>Anna Nagar</span><span>7 appts · ₹32,500</span></div>
+              <div class="bar-track"><div class="bar-fill" data-w="44%"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h3>Sample Dental Chart — Ravi Kumar</h3>
+          <span class="link-btn">Open full chart →</span>
+        </div>
+        <div class="toothmap">
+          <div class="tooth healthy">18</div><div class="tooth healthy">17</div><div class="tooth treated">16</div><div class="tooth healthy">15</div>
+          <div class="tooth healthy">14</div><div class="tooth attention">13</div><div class="tooth healthy">12</div><div class="tooth healthy">11</div>
+          <div class="tooth healthy">21</div><div class="tooth healthy">22</div><div class="tooth healthy">23</div><div class="tooth treated">24</div>
+          <div class="tooth healthy">25</div><div class="tooth healthy">26</div><div class="tooth attention">27</div><div class="tooth healthy">28</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- GENERIC SECTIONS (auto-generated) -->
+    <div id="genericSections"></div>
+
+  </main>
+</div>
+
+<script>
+const MENU = [
+  { id:"dashboard", label:"Dashboard", icon:"📊", items:["Overall Clinic Summary","Branch-wise Overview","Today's Appointments","Revenue Snapshot","Pending Treatments"] },
+  { id:"branches", label:"Branch Management", icon:"🏢", items:["Add Branch","Branch List","Edit Branch Details","Assign Doctors to Branch","Assign Staff to Branch","Branch Settings","Branch Transfer"] },
+  { id:"doctors", label:"Doctors", icon:"👨‍⚕️", items:["Add Doctor","Doctor List","Doctor Profile","Schedule Management","Branch Assignment","Doctor Performance Report"] },
+  { id:"staff", label:"Staff Management", icon:"🧑‍💼", items:["Add Staff","Staff List","Role Management","Shift Scheduling","Branch Assignment"] },
+  { id:"patients", label:"Patients", icon:"👥", items:["Add Patient Registration","Patient List","Patient Profile","Medical History","Dental History","Patient Transfer Between Branches"] },
+  { id:"appointments", label:"Appointments", icon:"📅", items:["Book Appointment","Appointment Calendar View","Today's Appointments","Reschedule / Cancel","Waiting Queue","Doctor-wise Schedule"] },
+  { id:"billing", label:"Billing & Payments", icon:"💳", items:["Create Invoice","Payment Collection","Payment History","Pending Dues","Refund Management","Discounts & Offers"] },
+  { id:"treatments", label:"Dental Treatments", icon:"🦷", items:["Treatment Plans","Tooth Chart (Dental Mapping)","Ongoing Treatments","Completed Treatments","Treatment Cost Setup"] },
+  { id:"inventory", label:"Inventory / Stock", icon:"📦", items:["Add Materials","Stock List","Stock In / Stock Out","Low Stock Alerts","Supplier Management","Branch-wise Inventory"] },
+  { id:"reports", label:"Reports & Analytics", icon:"📈", items:["Daily Report","Monthly Report","Revenue Report","Doctor-wise Report","Patient Flow Report","Treatment Statistics","Branch-wise Reports"] },
+  { id:"notifications", label:"Notifications", icon:"📣", items:["Appointment Reminders","Follow-up Alerts","SMS/WhatsApp Logs","Broadcast Messages"] },
+  { id:"documents", label:"Documents & Records", icon:"📁", items:["X-rays Upload","Scans","Prescriptions","Medical Reports","Before/After Images"] },
+  { id:"users", label:"User Management", icon:"🔐", items:["Admin Users","Doctor Login Management","Staff Login Management","Role & Permission Control","Access Restrictions"] },
+  { id:"branchsettings", label:"Branch Settings", icon:"🏢", items:["Working Hours","Appointment Slot Duration","Holidays","Payment Settings","Tax Settings","Clinic Profile"] },
+  { id:"settings", label:"Settings", icon:"⚙️", items:["App Settings","Theme Settings","Notification Settings","Data Backup","Security Settings"] },
+  { id:"logout", label:"Logout", icon:"🚪", items:["Logout Account","Switch Branch"] },
+];
+
+const navScroll = document.getElementById("navScroll");
+const genericWrap = document.getElementById("genericSections");
+
+MENU.forEach((group, gi) => {
+  const groupEl = document.createElement("div");
+  groupEl.className = "nav-group" + (gi===0 ? " open active" : "");
+  groupEl.dataset.id = group.id;
+
+  const head = document.createElement("div");
+  head.className = "nav-head";
+  head.innerHTML = `<span class="ic">${group.icon}</span><span class="lbl">${group.label}</span><span class="chev">›</span>`;
+  groupEl.appendChild(head);
+
+  const subList = document.createElement("div");
+  subList.className = "sub-list";
+  group.items.forEach((item, ii) => {
+    const sub = document.createElement("div");
+    sub.className = "sub-item" + (gi===0 && ii===0 ? " current" : "");
+    sub.innerHTML = `<span class="t">${item}</span>`;
+    sub.addEventListener("click", (e) => {
+      e.stopPropagation();
+      document.querySelectorAll(".sub-item.current").forEach(s=>s.classList.remove("current"));
+      sub.classList.add("current");
+      document.querySelectorAll(".nav-group").forEach(g=>g.classList.remove("active"));
+      groupEl.classList.add("active");
+      activateSection(group.id, group.label, item);
+    });
+    subList.appendChild(sub);
+  });
+  groupEl.appendChild(subList);
+
+  head.addEventListener("click", () => {
+    const isOpen = groupEl.classList.contains("open");
+    document.querySelectorAll(".nav-group").forEach(g=>g.classList.remove("open"));
+    if(!isOpen) groupEl.classList.add("open");
+    document.querySelectorAll(".nav-group").forEach(g=>g.classList.remove("active"));
+    groupEl.classList.add("active");
+    activateSection(group.id, group.label, group.items[0]);
+  });
+
+  navScroll.appendChild(groupEl);
+
+  // build a generic content section for every group except dashboard (which is hand-built)
+  if(group.id !== "dashboard"){
+    const sec = document.createElement("section");
+    sec.className = "content-section";
+    sec.id = "sec-" + group.id;
+    const icons = ["🗂️","➕","📋","🛠️","🔍","📤","📥","🔔","💡","⏱️"];
+    let cardsHTML = group.items.map((item, idx) => `
+      <div class="mini-action" style="animation-delay:${0.05*idx}s">
+        <div class="mi-ic">${icons[idx % icons.length]}</div>
+        <div>
+          <div class="mi-t">${item}</div>
+          <div class="mi-d">Manage ${item.toLowerCase()} across all clinic branches.</div>
+        </div>
+      </div>`).join("");
+    sec.innerHTML = `
+      <div class="section-head">
+        <h2>${group.label}</h2>
+        <p>Quick actions and tools for ${group.label.toLowerCase()}.</p>
+      </div>
+      <div class="placeholder-grid">${cardsHTML}</div>
+    `;
+    genericWrap.appendChild(sec);
+  }
+});
+
+function activateSection(id, groupLabel, itemLabel){
+  document.querySelectorAll(".content-section").forEach(s=>s.classList.remove("active"));
+  const target = document.getElementById("sec-"+id);
+  if(target) target.classList.add("active");
+  document.getElementById("pageTitle").textContent = itemLabel || groupLabel;
+  document.getElementById("crumbEyebrow").textContent = groupLabel.toUpperCase();
+}
+
+// collapse sidebar
+document.getElementById("collapseBtn").addEventListener("click", () => {
+  document.getElementById("sidebar").classList.toggle("collapsed");
+});
+
+// animate counters
+function animateCounters(){
+  document.querySelectorAll(".num[data-count]").forEach(el => {
+    const target = parseInt(el.dataset.count, 10);
+    const prefix = el.dataset.prefix || "";
+    const dur = 1100;
+    const start = performance.now();
+    function step(now){
+      const p = Math.min(1, (now - start) / dur);
+      const eased = 1 - Math.pow(1 - p, 3);
+      const val = Math.floor(eased * target);
+      el.textContent = prefix + val.toLocaleString("en-IN");
+      if(p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  });
+}
+function animateBars(){
+  document.querySelectorAll(".bar-fill").forEach(b => {
+    requestAnimationFrame(()=>{ b.style.width = b.dataset.w; });
+  });
+}
+window.addEventListener("load", () => {
+  animateCounters();
+  setTimeout(animateBars, 150);
+});
+</script>
+</body>
+</html>
