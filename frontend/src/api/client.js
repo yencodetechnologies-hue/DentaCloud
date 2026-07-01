@@ -31,7 +31,7 @@ export function apiError(err) {
     return "Cannot reach the API server. Check your connection or backend deployment.";
   }
   if (err.response.status === 404) {
-    return "API not found (404). Redeploy Vercel and set MONGO_URI + JWT_SECRET in project settings.";
+    return "API not found (404). Set VITE_API_URL (or API_URL for Vercel proxy) and redeploy.";
   }
   return err.response?.data?.message || err.message || "Something went wrong";
 }
