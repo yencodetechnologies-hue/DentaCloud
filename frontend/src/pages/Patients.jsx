@@ -48,7 +48,6 @@ const emptyDefaults = {
   prescriptions: [],
   previousTreatment: false,
   gumBleeding: false,
-  insurance: false,
 };
 
 export default function Patients() {
@@ -118,8 +117,6 @@ export default function Patients() {
         ongoingProblem: r.ongoingProblem || "",
         firstVisitDate: r.firstVisitDate || "",
         reasonForVisit: r.reasonForVisit || "",
-        insurance: !!r.insurance,
-        paymentPreference: r.paymentPreference || "",
         idProof: r.idProof || "",
         xray: r.xray || "",
         prescriptions: r.prescriptions || [],
@@ -130,13 +127,16 @@ export default function Patients() {
       })}
       toPayload={(v) => {
         const { patientId, ...rest } = v;
+        // Remove billing/payment fields from patient payloads.
+        // (Old records may still contain these fields in the DB.)
+        const { insurance, paymentPreference, ...withoutBilling } = rest;
         return {
-          ...rest,
-          age: rest.age === "" ? 0 : rest.age,
-          dob: rest.dob || null,
-          lastVisitDate: rest.lastVisitDate || null,
-          firstVisitDate: rest.firstVisitDate || null,
-          branch: rest.branch || null,
+          ...withoutBilling,
+          age: withoutBilling.age === "" ? 0 : withoutBilling.age,
+          dob: withoutBilling.dob || null,
+          lastVisitDate: withoutBilling.lastVisitDate || null,
+          firstVisitDate: withoutBilling.firstVisitDate || null,
+          branch: withoutBilling.branch || null,
         };
       }}
       renderView={(r) => (

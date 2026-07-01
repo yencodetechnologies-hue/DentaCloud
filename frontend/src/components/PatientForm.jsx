@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import api, { apiError } from "../api/client.js";
 import { useToast } from "../context/ToastContext.jsx";
 
@@ -9,7 +9,6 @@ const STEPS = [
   { key: "medical", label: "Medical", icon: "🏥" },
   { key: "dental", label: "Dental", icon: "🦷" },
   { key: "visit", label: "Visit", icon: "📅" },
-  { key: "billing", label: "Billing", icon: "💳" },
   { key: "files", label: "Files", icon: "📁" },
   { key: "notes", label: "Notes", icon: "📝" },
 ];
@@ -38,22 +37,22 @@ const REASONS = [
   { value: "emergency", label: "Emergency" },
 ];
 
-const PAYMENTS = [
-  { value: "cash", label: "Cash" },
-  { value: "upi", label: "UPI" },
-  { value: "card", label: "Card" },
-];
-
 function getPath(obj, path) {
   return path.split(".").reduce((acc, k) => (acc == null ? acc : acc[k]), obj);
 }
 
 function ageFromDob(dob) {
   if (!dob) return "";
-  const d = new Date(dob);
-  if (Number.isNaN(d.getTime())) return "";
-  const diff = Date.now() - d.getTime();
-  const age = Math.floor(diff / (365.25 * 24 * 3600 * 1000));
+  // dob from <input type="date"> comes as YYYY-MM-DD; parse it as a local date.
+  const [y, m, day] = String(dob).slice(0, 10).split("-").map((n) => Number(n));
+  if (!y || !m || !day) return "";
+  const birth = new Date(y, m - 1, day);
+  if (Number.isNaN(birth.getTime())) return "";
+
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const md = today.getMonth() - birth.getMonth();
+  if (md < 0 || (md === 0 && today.getDate() < birth.getDate())) age -= 1;
   return age >= 0 ? age : "";
 }
 
@@ -62,6 +61,14 @@ export default function PatientForm({ values, setValues, saving, editing, onCanc
   const [step, setStep] = useState(0);
   const [stepError, setStepError] = useState("");
   const [uploading, setUploading] = useState("");
+  const dobAge = useMemo(() => ageFromDob(values?.dob), [values?.dob]);
+
+  // Keep age in sync with DOB when DOB is present.
+  useEffect(() => {
+    if (!values?.dob) return;
+    if (dobAge === "") return;
+    if (values.age !== dobAge) setValues({ ...values, age: dobAge });
+  }, [values, dobAge, setValues]);
 
   function set(path, value) {
     if (!path.includes(".")) {
@@ -105,8 +112,6 @@ export default function PatientForm({ values, setValues, saving, editing, onCanc
       if (!values.name?.trim()) return "Full name is required.";
       if (!values.gender) return "Gender is required.";
       if (!values.dob && !values.age) return "Date of birth or age is required.";
-    }
-    if (s === "contact") {
       if (!values.phone?.trim()) return "Mobile number is required.";
     }
     return "";
@@ -182,15 +187,39 @@ export default function PatientForm({ values, setValues, saving, editing, onCanc
                   value={val("dob") ? String(val("dob")).slice(0, 10) : ""}
                   onChange={(e) => {
                     const dob = e.target.value;
-                    setValues({ ...values, dob, age: ageFromDob(dob) || values.age });
+                    setValues({
+                      ...values,
+                      dob,
+                      age: dob ? ageFromDob(dob) : values.age,
+                    });
                   }}
                 />
               </Field>
               <Field label="Age">
-                <input type="number" min={0} value={val("age")} onChange={(e) => set("age", e.target.value === "" ? "" : Number(e.target.value))} />
+                <input
+                  type="number"
+                  min={0}
+                  value={val("dob") ? dobAge : val("age")}
+                  disabled={!!val("dob")}
+                  readOnly={!!val("dob")}
+                  onChange={(e) => set("age", e.target.value === "" ? "" : Number(e.target.value))}
+                />
               </Field>
               <Field label="Blood Group">
                 <input value={val("bloodGroup")} onChange={(e) => set("bloodGroup", e.target.value)} placeholder="e.g. O+" />
+              </Field>
+              <Field label="Patient ID" hint="Auto-generated">
+                <input value={editing ? val("patientId") : "Auto-generated on save"} disabled readOnly />
+              </Field>
+              <Field label="Mobile Number" req hint="Primary contact">
+                <input value={val("phone")} onChange={(e) => set("phone", e.target.value)} placeholder="10-digit mobile" />
+              </Field>
+              <Field label="Address" full>
+                <textarea
+                  value={val("address.street")}
+                  onChange={(e) => set("address.street", e.target.value)}
+                  placeholder="House/Flat, Street, Area, City, Pincode"
+                />
               </Field>
             </div>
             <PhotoUpload
@@ -205,23 +234,11 @@ export default function PatientForm({ values, setValues, saving, editing, onCanc
         {STEPS[step].key === "contact" && (
           <Section title="Contact Details" icon="📞">
             <div className="form-grid">
-              <Field label="Mobile Number" req hint="Primary contact">
-                <input value={val("phone")} onChange={(e) => set("phone", e.target.value)} placeholder="10-digit mobile" />
-              </Field>
               <Field label="Alternate Number">
                 <input value={val("altPhone")} onChange={(e) => set("altPhone", e.target.value)} />
               </Field>
               <Field label="Email">
                 <input type="email" value={val("email")} onChange={(e) => set("email", e.target.value)} />
-              </Field>
-              <Field label="Street" full>
-                <input value={val("address.street")} onChange={(e) => set("address.street", e.target.value)} />
-              </Field>
-              <Field label="City">
-                <input value={val("address.city")} onChange={(e) => set("address.city", e.target.value)} />
-              </Field>
-              <Field label="Pincode">
-                <input value={val("address.pincode")} onChange={(e) => set("address.pincode", e.target.value)} />
               </Field>
             </div>
           </Section>
@@ -230,9 +247,6 @@ export default function PatientForm({ values, setValues, saving, editing, onCanc
         {STEPS[step].key === "id" && (
           <Section title="Patient Identification" icon="🆔">
             <div className="form-grid">
-              <Field label="Patient ID" hint="Auto-generated">
-                <input value={editing ? val("patientId") : "Auto-generated on save"} disabled readOnly />
-              </Field>
               <Field label="Branch">
                 <select value={val("branch")} onChange={(e) => set("branch", e.target.value)}>
                   <option value="">Select branch…</option>
@@ -303,20 +317,6 @@ export default function PatientForm({ values, setValues, saving, editing, onCanc
                 <select value={val("reasonForVisit")} onChange={(e) => set("reasonForVisit", e.target.value)}>
                   <option value="">Select…</option>
                   {REASONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
-                </select>
-              </Field>
-            </div>
-          </Section>
-        )}
-
-        {STEPS[step].key === "billing" && (
-          <Section title="Billing Info" icon="💳">
-            <div className="form-grid">
-              <YesNo label="Insurance available" value={!!values.insurance} onChange={(v) => set("insurance", v)} />
-              <Field label="Payment preference">
-                <select value={val("paymentPreference")} onChange={(e) => set("paymentPreference", e.target.value)}>
-                  <option value="">Select…</option>
-                  {PAYMENTS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
                 </select>
               </Field>
             </div>
