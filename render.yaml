@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: evident-dental-api
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES
+        value: 7d
+      - key: CLIENT_ORIGIN
+        value: https://denta-cloud-psi.vercel.app
+      - key: MONGO_URI
+        sync: false

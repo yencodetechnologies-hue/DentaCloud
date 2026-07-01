@@ -91,11 +91,11 @@ export default function Login() {
             {error && <div className="form-error">{error}</div>}
             <div className="field">
               <label>Email</label>
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@evident.com" required />
+              <input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@evident.com" required />
             </div>
             <div className="field">
               <label>Password</label>
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required />
+              <input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required />
             </div>
             <button className="btn btn-primary login-submit" type="submit" disabled={loading}>
               {loading ? "Signing in..." : `Sign in as ${role.label}`}

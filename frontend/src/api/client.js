@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "/api",
+  baseURL: import.meta.env.VITE_API_URL || "/api",
 });
 
 api.interceptors.request.use((config) => {
@@ -27,5 +27,11 @@ api.interceptors.response.use(
 export default api;
 
 export function apiError(err) {
+  if (!err.response) {
+    return "Cannot reach the API server. Check your connection or backend deployment.";
+  }
+  if (err.response.status === 404) {
+    return "API not found (404). Deploy the backend and set API_URL in Vercel.";
+  }
   return err.response?.data?.message || err.message || "Something went wrong";
 }
