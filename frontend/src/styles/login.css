@@ -6,12 +6,12 @@
 }
 .login-hero::before{
   content:''; position:absolute; width:520px; height:520px; border-radius:50%;
-  background:radial-gradient(circle, rgba(47,230,196,.22), transparent 65%);
+  background:radial-gradient(circle, rgba(30,144,255,.22), transparent 65%);
   top:-160px; right:-140px;
 }
 .login-hero::after{
   content:''; position:absolute; width:380px; height:380px; border-radius:50%;
-  background:radial-gradient(circle, rgba(47,230,196,.12), transparent 60%);
+  background:radial-gradient(circle, rgba(30,144,255,.12), transparent 60%);
   bottom:-120px; left:-100px;
 }
 .login-brand{ display:flex; align-items:center; gap:14px; position:relative; z-index:2;}
@@ -38,7 +38,7 @@
   cursor:pointer; transition:all .2s var(--ease); background:var(--card);
 }
 .role-opt:hover{ border-color:var(--mint); transform:translateY(-2px);}
-.role-opt.active{ border-color:var(--mint); background:#E9FCF7; box-shadow:0 0 0 3px rgba(47,230,196,.15);}
+.role-opt.active{ border-color:var(--mint); background:#E7F1FF; box-shadow:0 0 0 3px rgba(30,144,255,.15);}
 .role-opt .emoji{ font-size:22px; }
 .role-opt .rl{ font-size:12px; font-weight:600; margin-top:6px;}
 .role-opt .rd{ font-size:10px; color:var(--muted); margin-top:2px;}
