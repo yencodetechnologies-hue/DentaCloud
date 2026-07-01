@@ -60,7 +60,6 @@ export default function Patients() {
       endpoint="patients"
       singular="Patient"
       wideForm
-      hideDefaultFooter
       statusOptions={[{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }]}
       defaultValues={emptyDefaults}
       columns={[
@@ -83,13 +82,11 @@ export default function Patients() {
         { key: "status", header: "Status", render: (r) => <Badge value={r.status} /> },
       ]}
       fields={() => []}
-      renderForm={({ values, setValues, saving, editing, onCancel }) => (
+      renderForm={({ values, setValues, editing }) => (
         <PatientForm
           values={values}
           setValues={setValues}
-          saving={saving}
           editing={editing}
-          onCancel={onCancel}
           branches={branches}
         />
       )}

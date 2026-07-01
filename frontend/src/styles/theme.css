@@ -290,32 +290,15 @@ button{font-family:inherit;}
 .toast.error{ border-left-color:var(--coral); }
 @keyframes toastIn{ from{opacity:0; transform:translateX(30px);} to{opacity:1; transform:translateX(0);} }
 
-/* ===== PATIENT WIZARD ===== */
+/* ===== PATIENT FORM ===== */
 .cell-avatar .av.av-img{ object-fit:cover; }
 .av-img{ width:34px; height:34px; border-radius:50%; object-fit:cover; flex-shrink:0; }
 
-.wizard{ display:flex; flex-direction:column; }
+.patient-form .form-section-title{ font-family:'Outfit',sans-serif; font-size:14px; font-weight:700; margin:20px 0 14px; color:var(--ink); }
+.patient-form .form-section-title:first-child{ margin-top:0; }
+.form-more-toggle{ margin-top:18px; width:100%; justify-content:center; }
+.form-more{ margin-top:16px; padding-top:4px; border-top:1px solid var(--line); }
 .field .hint{ font-weight:500; color:var(--muted); font-size:11px; text-transform:none; letter-spacing:0; }
-
-/* stepper */
-.wiz-steps{ position:relative; display:flex; justify-content:space-between; gap:4px; margin-bottom:22px; padding-top:4px; }
-.wiz-progress{ position:absolute; top:21px; left:24px; right:24px; height:3px; background:var(--line); border-radius:3px; overflow:hidden; z-index:0; }
-.wiz-progress span{ display:block; height:100%; background:linear-gradient(90deg,var(--mint),var(--mint-dim)); border-radius:3px; transition:width .35s var(--ease); }
-.wiz-step{ position:relative; z-index:1; flex:1; background:transparent; border:none; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:6px; padding:0; }
-.wiz-step .dot{ width:34px; height:34px; border-radius:50%; background:var(--card); border:2px solid var(--line); display:flex; align-items:center; justify-content:center; font-size:15px; transition:all .2s var(--ease); }
-.wiz-step .lbl{ font-size:10.5px; font-weight:600; color:var(--muted); transition:color .2s var(--ease); }
-.wiz-step.active .dot{ border-color:var(--mint); background:#fff; box-shadow:0 0 0 4px rgba(30,144,255,.18); transform:scale(1.05); }
-.wiz-step.active .lbl{ color:var(--ink); }
-.wiz-step.done .dot{ background:linear-gradient(135deg,var(--mint),var(--mint-dim)); border-color:transparent; color:var(--navy); font-weight:700; }
-
-/* body */
-.wiz-body{ min-height:240px; }
-.wiz-section-title{ font-family:'Outfit',sans-serif; font-size:15px; font-weight:700; margin-bottom:16px; display:flex; align-items:center; gap:8px; }
-.wiz-section-title span{ font-size:18px; }
-
-/* footer nav */
-.wiz-foot{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:22px; padding-top:18px; border-top:1px solid var(--line); }
-.wiz-count{ font-size:12px; color:var(--muted); font-weight:600; }
 
 /* yes / no toggle */
 .yesno{ display:inline-flex; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
@@ -367,7 +350,6 @@ button{font-family:inherit;}
   .grid-2{ grid-template-columns:1fr; }
   .form-grid, .detail-grid{ grid-template-columns:1fr; }
   .search-box{ display:none; }
-  .wiz-step .lbl{ display:none; }
 }
 
 /* ===== TABLET / MOBILE: OFF-CANVAS SIDEBAR ===== */
@@ -424,10 +406,6 @@ button{font-family:inherit;}
 
   .toast-wrap{ left:12px; right:12px; bottom:12px; }
   .toast{ width:100%; }
-
-  .wiz-steps{ gap:2px; }
-  .wiz-step .dot{ width:30px; height:30px; font-size:13px; }
-  .wiz-progress{ left:18px; right:18px; }
 
   .topbar-right{ gap:8px; }
   .avatar{ width:36px; height:36px; }
