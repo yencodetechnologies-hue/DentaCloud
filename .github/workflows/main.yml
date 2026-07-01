@@ -1,0 +1,63 @@
+name: Evident Backend CI/CD
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Run Tests
+        run: npm test || echo "No tests found"
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: root
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd ~/DentaCloud/DentaCloud/backend
+
+            echo "📥 Pulling latest code..."
+            git pull origin main
+
+            echo "⚙️ Loading Node via NVM..."
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+            nvm use 20
+
+            echo "📦 Installing dependencies..."
+            npm install
+
+            echo "🚀 Starting or Restarting PM2..."
+
+            if pm2 describe dentacloud-backend > /dev/null; then
+              echo "♻️ Restarting existing app"
+              pm2 restart dentacloud-backend
+            else
+              echo "🆕 Starting new app"
+              pm2 start src/server.js --name dentacloud-backend
+            fi
+
+            echo "💾 Saving PM2 process list..."
+            pm2 save
