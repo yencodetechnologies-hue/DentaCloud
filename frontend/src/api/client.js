@@ -1,8 +1,18 @@
 import axios from "axios";
 
+const PROD_API_BASE = "https://evident.octosofttechnologies.in/api";
+
+function computeBaseURL() {
+  // No frontend .env: choose based on runtime host.
+  // - Local dev: use same-origin `/api` so Vite proxy routes to backend
+  // - Hosted: call the deployed backend directly
+  const host = window.location.hostname;
+  const isLocal = host === "localhost" || host === "127.0.0.1";
+  return isLocal ? "/api" : PROD_API_BASE;
+}
+
 const api = axios.create({
-  // Production backend (hardcoded as requested)
-  baseURL: "https://evident.octosofttechnologies.in/api",
+  baseURL: computeBaseURL(),
 });
 
 api.interceptors.request.use((config) => {
