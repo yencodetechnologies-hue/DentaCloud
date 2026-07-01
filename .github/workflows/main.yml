@@ -9,12 +9,14 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+    defaults:
+      run:
+        working-directory: backend/src
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
 
@@ -36,28 +38,20 @@ jobs:
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cd ~/DentaCloud/DentaCloud/backend
+            cd ~/DentaCloud/DentaCloud/backend/src
 
-            echo "📥 Pulling latest code..."
             git pull origin main
 
-            echo "⚙️ Loading Node via NVM..."
             export NVM_DIR="$HOME/.nvm"
             [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
             nvm use 20
 
-            echo "📦 Installing dependencies..."
             npm install
 
-            echo "🚀 Starting or Restarting PM2..."
-
-            if pm2 describe dentacloud-backend > /dev/null; then
-              echo "♻️ Restarting existing app"
+            if pm2 describe dentacloud-backend >/dev/null; then
               pm2 restart dentacloud-backend
             else
-              echo "🆕 Starting new app"
-              pm2 start src/server.js --name dentacloud-backend
+              pm2 start server.js --name dentacloud-backend
             fi
 
-            echo "💾 Saving PM2 process list..."
             pm2 save
