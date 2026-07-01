@@ -3,7 +3,10 @@ import dns from "node:dns";
 
 const SRV_DNS_ERROR = /querySrv|ECONNREFUSED|ENOTFOUND|ETIMEOUT|EREFUSED|getaddrinfo/i;
 
-export async function connectDB() {
+const cache = globalThis.__mongooseCache ?? { conn: null, promise: null };
+globalThis.__mongooseCache = cache;
+
+async function connectOnce() {
   const uri = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/evident-dental";
   mongoose.set("strictQuery", true);
   const opts = { serverSelectionTimeoutMS: 20000 };
@@ -24,4 +27,11 @@ export async function connectDB() {
 
   console.log("[db] connected");
   return mongoose.connection;
+}
+
+export async function connectDB() {
+  if (cache.conn) return cache.conn;
+  if (!cache.promise) cache.promise = connectOnce();
+  cache.conn = await cache.promise;
+  return cache.conn;
 }

@@ -9,13 +9,26 @@ const rewrites = [];
 if (backend) {
   rewrites.push({ source: "/api/:path*", destination: `${backend}/api/:path*` });
   rewrites.push({ source: "/uploads/:path*", destination: `${backend}/uploads/:path*` });
+} else {
+  rewrites.push({ source: "/api/:path*", destination: "/api" });
+  rewrites.push({ source: "/uploads/:path*", destination: "/api" });
 }
 
 rewrites.push({ source: "/(.*)", destination: "/index.html" });
 
-writeFileSync("vercel.json", JSON.stringify({ rewrites }, null, 2) + "\n");
+const config = {
+  functions: {
+    "api/index.js": {
+      maxDuration: 30,
+      includeFiles: "../backend/src/**",
+    },
+  },
+  rewrites,
+};
+
+writeFileSync("vercel.json", JSON.stringify(config, null, 2) + "\n");
 console.log(
   backend
     ? `[vercel] proxying /api -> ${backend}/api`
-    : "[vercel] no API_URL set — /api will 404 until backend is configured"
+    : "[vercel] using serverless API (set MONGO_URI + JWT_SECRET in Vercel)"
 );
