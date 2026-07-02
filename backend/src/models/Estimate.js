@@ -11,22 +11,13 @@ const itemSchema = new mongoose.Schema(
   { _id: false }
 );
 
-const paymentSchema = new mongoose.Schema(
+const estimateSchema = new mongoose.Schema(
   {
-    date: { type: Date, default: Date.now },
-    amount: { type: Number, required: true },
-    method: { type: String, enum: ["cash", "card", "upi", "net-banking", "insurance", "other"], default: "cash" },
-    reference: { type: String, trim: true },
-  },
-  { _id: false }
-);
-
-const invoiceSchema = new mongoose.Schema(
-  {
-    invoiceNo: { type: String, unique: true, trim: true },
+    estimateNo: { type: String, unique: true, trim: true },
     patient: { type: mongoose.Schema.Types.ObjectId, ref: "Patient", required: true },
     branch: { type: mongoose.Schema.Types.ObjectId, ref: "Branch" },
     date: { type: Date, default: Date.now },
+    validUntil: { type: Date },
     items: { type: [itemSchema], default: [] },
     subtotal: { type: Number, default: 0 },
     taxBreakdown: {
@@ -37,15 +28,13 @@ const invoiceSchema = new mongoose.Schema(
     tax: { type: Number, default: 0 },
     discount: { type: Number, default: 0 },
     total: { type: Number, default: 0 },
-    payments: { type: [paymentSchema], default: [] },
-    paid: { type: Number, default: 0 },
-    status: { type: String, enum: ["paid", "partial", "unpaid"], default: "unpaid" },
-    paymentMethod: { type: String, enum: ["cash", "card", "upi", "insurance", "other"], default: "cash" },
+    status: { type: String, enum: ["draft", "sent", "accepted", "rejected", "converted"], default: "draft" },
+    notes: { type: String, trim: true },
   },
   { timestamps: true }
 );
 
-invoiceSchema.pre("validate", function (next) {
+estimateSchema.pre("validate", function (next) {
   const sub = (this.items || []).reduce((s, it) => s + (it.qty || 0) * (it.price || 0), 0);
   const totalGst = (this.items || []).reduce(
     (s, it) => s + ((it.qty || 0) * (it.price || 0) * (it.gstRate || 0)) / 100,
@@ -55,11 +44,7 @@ invoiceSchema.pre("validate", function (next) {
   this.taxBreakdown = { cgst: totalGst / 2, sgst: totalGst / 2, igst: 0 };
   this.tax = totalGst;
   this.total = Math.max(0, sub + totalGst - (this.discount || 0));
-  this.paid = (this.payments || []).reduce((s, p) => s + (p.amount || 0), 0);
-  if (this.paid >= this.total && this.total > 0) this.status = "paid";
-  else if (this.paid > 0) this.status = "partial";
-  else this.status = "unpaid";
   next();
 });
 
-export default mongoose.model("Invoice", invoiceSchema);
+export default mongoose.model("Estimate", estimateSchema);

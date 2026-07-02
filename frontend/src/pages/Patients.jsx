@@ -1,6 +1,7 @@
 import CrudPage from "../components/CrudPage.jsx";
 import Badge from "../components/Badge.jsx";
 import PatientForm from "../components/PatientForm.jsx";
+import QuickContact from "../components/QuickContact.jsx";
 import useOptions from "../hooks/useOptions.js";
 import { DetailGrid, DetailItem } from "../components/Detail.jsx";
 
@@ -76,7 +77,7 @@ export default function Patients() {
             </div>
           ),
         },
-        { key: "phone", header: "Phone", render: (r) => r.phone || "—" },
+        { key: "phone", header: "Phone", render: (r) => <QuickContact phone={r.phone} /> },
         { key: "branch", header: "Branch", render: (r) => r.branch?.name || "—" },
         { key: "reasonForVisit", header: "Reason", render: (r) => REASON_LABELS[r.reasonForVisit] || "—" },
         { key: "status", header: "Status", render: (r) => <Badge value={r.status} /> },

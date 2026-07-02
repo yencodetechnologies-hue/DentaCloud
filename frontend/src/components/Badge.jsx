@@ -10,6 +10,20 @@ const MAP = {
   cancelled: "badge-red",
   "no-show": "badge-red",
   inactive: "badge-gray",
+  missed: "badge-red",
+  pending: "badge-amber",
+  draft: "badge-gray",
+  sent: "badge-blue",
+  accepted: "badge-green",
+  rejected: "badge-red",
+  converted: "badge-green",
+  present: "badge-green",
+  absent: "badge-red",
+  "half-day": "badge-amber",
+  leave: "badge-amber",
+  logged: "badge-gray",
+  sent_notification: "badge-blue",
+  failed: "badge-red",
 };
 
 export default function Badge({ value }) {

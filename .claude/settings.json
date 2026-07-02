@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find frontend/src -maxdepth 3 -type d)",
+      "Bash(find frontend/src -iname \"*.jsx\" -path \"*page*\")",
+      "Bash(find frontend/src -iname \"*.tsx\" -path \"*page*\")"
+    ]
+  }
+}

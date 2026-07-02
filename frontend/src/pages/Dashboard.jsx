@@ -29,6 +29,8 @@ const SPARKS = [
   [50, 60, 45, 75, 95, 70, 88],
   [60, 40, 80, 35, 65, 50, 72],
   [30, 55, 20, 45, 25, 38, 22],
+  [45, 65, 50, 70, 60, 80, 55],
+  [35, 50, 30, 60, 40, 55, 45],
 ];
 
 function fmtTime(d) {
@@ -61,6 +63,8 @@ export default function Dashboard() {
     { icon: "💳", bg: "#FFF3E3", trend: "▲ 8.4%", up: true, value: stats.todayRevenue, prefix: "₹", label: "Revenue Today" },
     { icon: "🦷", bg: "#EAE8FF", trend: "▲ 4", up: true, value: stats.pendingTreatments, label: "Pending Treatments" },
     { icon: "👥", bg: "#E3FBF6", trend: "▲ 6%", up: true, value: stats.patients, label: "Total Patients" },
+    { icon: "🔁", bg: "#FFF3E3", trend: "", up: true, value: stats.followUpsUpcoming, label: "Follow-up Patients" },
+    { icon: "⚠️", bg: "#FFEDEB", trend: "", up: false, value: (stats.followUpsMissed || 0) + (stats.missedAppointments || 0), label: "Missed Appointments" },
   ];
 
   return (
@@ -151,6 +155,7 @@ export default function Dashboard() {
           <div className="row-item"><div className="av">👨‍⚕️</div><div className="info"><div className="nm">{loading ? "—" : stats.doctors}</div><div className="sub">Doctors</div></div></div>
           <div className="row-item"><div className="av">🧑‍💼</div><div className="info"><div className="nm">{loading ? "—" : stats.staff}</div><div className="sub">Staff Members</div></div></div>
           <div className="row-item"><div className="av">👥</div><div className="info"><div className="nm">{loading ? "—" : stats.patients}</div><div className="sub">Patients</div></div></div>
+          <div className="row-item"><div className="av">🕒</div><div className="info"><div className="nm">{loading ? "—" : stats.staffPresent}</div><div className="sub">Staff Present Today</div></div></div>
         </div>
       </div>
     </div>

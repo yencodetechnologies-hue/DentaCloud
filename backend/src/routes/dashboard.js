@@ -6,6 +6,8 @@ import Patient from "../models/Patient.js";
 import Appointment from "../models/Appointment.js";
 import Invoice from "../models/Invoice.js";
 import Treatment from "../models/Treatment.js";
+import FollowUp from "../models/FollowUp.js";
+import Attendance from "../models/Attendance.js";
 import { asyncHandler } from "../controllers/crudController.js";
 
 const router = Router();
@@ -33,6 +35,9 @@ router.get(
       revenueAgg,
       upcoming,
       branchAgg,
+      followUpsUpcoming,
+      followUpsMissed,
+      missedAppointments,
     ] = await Promise.all([
       Branch.countDocuments(),
       Doctor.countDocuments(),
@@ -54,7 +59,12 @@ router.get(
         { $match: { date: { $gte: start, $lte: end } } },
         { $group: { _id: "$branch", appts: { $sum: 1 } } },
       ]),
+      FollowUp.countDocuments({ status: "pending", dueDate: { $gte: start } }),
+      FollowUp.countDocuments({ status: "pending", dueDate: { $lt: start } }),
+      Appointment.countDocuments({ status: "no-show", date: { $gte: start, $lte: end } }),
     ]);
+
+    const staffPresent = await Attendance.countDocuments({ date: { $gte: start, $lte: end }, status: "present" });
 
     // build branch-wise breakdown with names + today's revenue
     const branchDocs = await Branch.find().select("name");
@@ -80,6 +90,10 @@ router.get(
         todayAppointments,
         pendingTreatments,
         todayRevenue: revenueAgg[0]?.total || 0,
+        followUpsUpcoming,
+        followUpsMissed,
+        missedAppointments,
+        staffPresent,
       },
       upcoming,
       branchwise,

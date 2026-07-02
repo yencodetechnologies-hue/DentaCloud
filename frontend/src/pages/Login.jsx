@@ -4,9 +4,14 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { apiError } from "../api/client.js";
 
 const ROLES = [
-  { id: "dental-admin", emoji: "🛡️", label: "Dental Admin", desc: "Full access", email: "admin@evident.com", password: "admin123" },
+  { id: "dental-admin", emoji: "🛡️", label: "Admin", desc: "Full access", email: "admin@evident.com", password: "admin123" },
   { id: "doctor", emoji: "👨‍⚕️", label: "Doctor", desc: "Clinical", email: "doctor@evident.com", password: "doctor123" },
   { id: "staff", emoji: "🧑‍💼", label: "Staff", desc: "Front desk", email: "staff@evident.com", password: "staff123" },
+  { id: "csa", emoji: "☎️", label: "CSA", desc: "Customer service", email: "csa@evident.com", password: "csa123" },
+  { id: "housekeeping", emoji: "🧹", label: "Housekeeping", desc: "Facilities", email: "housekeeping@evident.com", password: "housekeeping123" },
+  { id: "security", emoji: "🛡️", label: "Security", desc: "Premises", email: "security@evident.com", password: "security123" },
+  { id: "patient", emoji: "🧑", label: "Patient", desc: "Self-service", email: "patient@evident.com", password: "patient123" },
+  { id: "vendor", emoji: "🚚", label: "Vendor", desc: "Supplier portal", email: "vendor@evident.com", password: "vendor123" },
 ];
 
 export default function Login() {

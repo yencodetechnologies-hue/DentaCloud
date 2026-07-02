@@ -20,6 +20,13 @@ export default function Layout() {
 
   const current = MENU.find((m) => m.path === location.pathname);
   const roleLabel = (user?.role || "dental-admin").replace("-", " ");
+  const visibleMenu = MENU.filter((item) => item.section || !item.roles || item.roles.includes(user?.role));
+  // drop section headers that end up with no visible items under them
+  const menu = visibleMenu.filter((item, i) => {
+    if (!item.section) return true;
+    const next = visibleMenu[i + 1];
+    return next && !next.section;
+  });
 
   return (
     <div className="app-shell">
@@ -46,7 +53,7 @@ export default function Layout() {
         </div>
 
         <nav className="nav-scroll">
-          {MENU.map((item, i) =>
+          {menu.map((item, i) =>
             item.section ? (
               <div className="nav-section-label" key={`s-${i}`}>{item.section}</div>
             ) : (
