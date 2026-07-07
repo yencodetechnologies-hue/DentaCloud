@@ -35,11 +35,17 @@ router.use("/uploads", uploadRoutes);
 router.use("/branches", resourceRouter(Branch, { searchFields: ["name", "code", "city", "phone"] }));
 router.use(
   "/doctors",
-  resourceRouter(Doctor, { searchFields: ["name", "specialization", "email", "phone"], populate: ["branch"] })
+  resourceRouter(Doctor, {
+    searchFields: ["name", "firstName", "lastName", "specialization", "email", "phone", "location"],
+    populate: ["branch"],
+  })
 );
 router.use(
   "/staff",
-  resourceRouter(Staff, { searchFields: ["name", "role", "email", "phone"], populate: ["branch"] })
+  resourceRouter(Staff, {
+    searchFields: ["name", "firstName", "lastName", "email", "phone", "location", "qualification", "bankName"],
+    populate: ["branch"],
+  })
 );
 router.use(
   "/patients",
