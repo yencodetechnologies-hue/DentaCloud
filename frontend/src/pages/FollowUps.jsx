@@ -1,4 +1,5 @@
 import CrudPage from "../components/CrudPage.jsx";
+import PageDashboard from "../components/PageDashboard.jsx";
 import Badge from "../components/Badge.jsx";
 import useOptions from "../hooks/useOptions.js";
 import api, { apiError } from "../api/client.js";
@@ -23,7 +24,6 @@ function toDateInput(d) {
 export default function FollowUps() {
   const patients = useOptions("patients", (p) => ({ value: p._id, label: p.name }));
   const doctors = useOptions("doctors", (d) => ({ value: d._id, label: d.name }));
-  const branches = useOptions("branches", (b) => ({ value: b._id, label: b.name }));
   const toast = useToast();
 
   async function logReminder(r) {
@@ -52,6 +52,16 @@ export default function FollowUps() {
       singular="Follow-up"
       statusOptions={STATUS}
       defaultValues={{ status: "pending", dueDate: toDateInput(new Date()) }}
+      topContent={
+        <PageDashboard
+          resource="follow-ups"
+          cards={[
+            { key: "pending", label: "Pending", icon: "🔁" },
+            { key: "overdue", label: "Overdue", icon: "⚠️" },
+            { key: "total", label: "Total", icon: "📊" },
+          ]}
+        />
+      }
       columns={[
         { key: "patient", header: "Patient", render: (r) => r.patient?.name || "—" },
         { key: "doctor", header: "Doctor", render: (r) => r.doctor?.name || "—" },
@@ -79,7 +89,7 @@ export default function FollowUps() {
       fields={() => [
         { name: "patient", label: "Patient", type: "select", options: patients, required: true },
         { name: "doctor", label: "Doctor", type: "select", options: doctors },
-        { name: "branch", label: "Branch", type: "select", options: branches },
+        { name: "branch", label: "Branch", type: "clinicBranch" },
         { name: "dueDate", label: "Due Date", type: "date", required: true },
         { name: "reason", label: "Reason", placeholder: "e.g. Post-treatment review" },
         { name: "status", label: "Status", type: "select", options: STATUS },

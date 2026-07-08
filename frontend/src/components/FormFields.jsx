@@ -1,3 +1,5 @@
+import ClinicBranchField from "./ClinicBranchField.jsx";
+
 export default function FormFields({ fields, values, onChange }) {
   function set(name, value) {
     onChange({ ...values, [name]: value });
@@ -8,6 +10,20 @@ export default function FormFields({ fields, values, onChange }) {
       {fields.map((f) => {
         const val = values[f.name] ?? "";
         const cls = f.full ? "field full" : "field";
+
+        if (f.type === "clinicBranch") {
+          return (
+            <div className={f.full ? "full" : undefined} key={f.name}>
+              <ClinicBranchField
+                label={f.label}
+                required={f.required}
+                value={val}
+                onChange={(branchId) => set(f.name, branchId)}
+              />
+            </div>
+          );
+        }
+
         return (
           <div className={cls} key={f.name}>
             <label>

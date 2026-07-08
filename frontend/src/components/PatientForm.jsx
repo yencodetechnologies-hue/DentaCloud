@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import api, { apiError } from "../api/client.js";
 import { useToast } from "../context/ToastContext.jsx";
+import ClinicBranchField from "./ClinicBranchField.jsx";
 
 const GENDERS = [
   { value: "male", label: "Male" },
@@ -44,7 +45,7 @@ function ageFromDob(dob) {
   return age >= 0 ? age : "";
 }
 
-export default function PatientForm({ values, setValues, editing, branches = [] }) {
+export default function PatientForm({ values, setValues, editing }) {
   const toast = useToast();
   const [showMore, setShowMore] = useState(!!editing);
   const [uploading, setUploading] = useState("");
@@ -133,12 +134,10 @@ export default function PatientForm({ values, setValues, editing, branches = [] 
         <Field label="Mobile Number" req>
           <input value={val("phone")} onChange={(e) => set("phone", e.target.value)} placeholder="10-digit mobile" required />
         </Field>
-        <Field label="Branch">
-          <select value={val("branch")} onChange={(e) => set("branch", e.target.value)}>
-            <option value="">Select branch…</option>
-            {branches.map((b) => <option key={b.value} value={b.value}>{b.label}</option>)}
-          </select>
-        </Field>
+        <ClinicBranchField
+          value={val("branch")}
+          onChange={(branchId) => set("branch", branchId)}
+        />
         <Field label="Reason for visit">
           <select value={val("reasonForVisit")} onChange={(e) => set("reasonForVisit", e.target.value)}>
             <option value="">Select…</option>

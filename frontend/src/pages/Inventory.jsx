@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import CrudPage from "../components/CrudPage.jsx";
+import PageDashboard from "../components/PageDashboard.jsx";
 import FileDrop from "../components/FileDrop.jsx";
+import ClinicBranchField from "../components/ClinicBranchField.jsx";
 import useOptions from "../hooks/useOptions.js";
 import api from "../api/client.js";
 import { DetailGrid, DetailItem } from "../components/Detail.jsx";
@@ -51,7 +53,6 @@ function InventorySummary({ version }) {
 
 export default function Inventory() {
   const vendors = useOptions("vendors", (v) => ({ value: v._id, label: v.name }));
-  const branches = useOptions("branches", (b) => ({ value: b._id, label: b.name }));
 
   return (
     <CrudPage
@@ -59,8 +60,19 @@ export default function Inventory() {
       subtitle="Track materials, chairs and stock levels."
       endpoint="inventory"
       singular="Item"
-      defaultValues={{ category: "material", quantity: 0, unit: "units", amount: 0, reorderLevel: 0 }}
-      topContent={<InventorySummary />}
+      defaultValues={{ category: "material", quantity: 0, unit: "units", amount: 0, ratePerUnit: 0, charge: 0, reorderLevel: 0 }}
+      topContent={
+        <>
+          <PageDashboard
+            resource="inventory"
+            cards={[
+              { key: "total", label: "Total Items", icon: "📦" },
+              { key: "lowStock", label: "Low Stock", icon: "⚠️" },
+            ]}
+          />
+          <InventorySummary />
+        </>
+      }
       wideForm
       columns={[
         { key: "name", header: "Item", render: (r) => <span className="cell-main">{r.name}</span> },
@@ -90,13 +102,10 @@ export default function Inventory() {
               {vendors.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </div>
-          <div className="field">
-            <label>Branch</label>
-            <select value={values.branch || ""} onChange={(e) => setValues({ ...values, branch: e.target.value })}>
-              <option value="">Select…</option>
-              {branches.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-          </div>
+          <ClinicBranchField
+            value={values.branch || ""}
+            onChange={(branchId) => setValues({ ...values, branch: branchId })}
+          />
           <div className="field">
             <label>Quantity</label>
             <input type="number" min="0" value={values.quantity ?? 0} onChange={(e) => setValues({ ...values, quantity: Number(e.target.value) })} />
@@ -112,6 +121,18 @@ export default function Inventory() {
           <div className="field">
             <label>Amount (₹)</label>
             <input type="number" min="0" value={values.amount ?? 0} onChange={(e) => setValues({ ...values, amount: Number(e.target.value) })} />
+          </div>
+          <div className="field">
+            <label>Rate Per Unit (₹)</label>
+            <input type="number" min="0" value={values.ratePerUnit ?? 0} onChange={(e) => setValues({ ...values, ratePerUnit: Number(e.target.value) })} />
+          </div>
+          <div className="field">
+            <label>Charge (₹)</label>
+            <input type="number" min="0" value={values.charge ?? 0} onChange={(e) => setValues({ ...values, charge: Number(e.target.value) })} />
+          </div>
+          <div className="field full">
+            <label>Instructions</label>
+            <textarea rows={2} value={values.instructions || ""} onChange={(e) => setValues({ ...values, instructions: e.target.value })} />
           </div>
           <div className="field">
             <label>Purchase Date</label>
@@ -137,6 +158,9 @@ export default function Inventory() {
         unit: r.unit,
         reorderLevel: r.reorderLevel,
         amount: r.amount,
+        ratePerUnit: r.ratePerUnit,
+        charge: r.charge,
+        instructions: r.instructions || "",
         purchaseDate: toDateInput(r.purchaseDate),
         expiryDate: toDateInput(r.expiryDate),
         warrantyUntil: toDateInput(r.warrantyUntil),

@@ -1,25 +1,27 @@
 import { useEffect, useMemo, useState } from "react";
 import CrudPage from "../components/CrudPage.jsx";
+import PageDashboard from "../components/PageDashboard.jsx";
 import Badge from "../components/Badge.jsx";
-import useOptions from "../hooks/useOptions.js";
+import ClinicBranchField from "../components/ClinicBranchField.jsx";
+import BusinessHoursEditor from "../components/BusinessHoursEditor.jsx";
 import { DetailGrid, DetailItem } from "../components/Detail.jsx";
 import api, { apiError } from "../api/client.js";
 import { useToast } from "../context/ToastContext.jsx";
 
-const TITLE_OPTIONS = ["Baby.", "Dr.", "Mr.", "Mrs.", "Ms."];
-const RELATION_OPTIONS = ["D/o", "S/o", "W/o", "C/o"];
-const ALT_RELATION_OPTIONS = ["Father", "Mother", "Spouse", "Guardian", "Other"];
+const TITLE_OPTIONS = ["Dr."];
+const RELATION_OPTIONS = ["D/o", "F/o", "H/o", "M/o", "S/o", "W/o"];
+const ALT_RELATION_OPTIONS = ["Father", "Daughter", "Mother", "Son", "Sister", "Spouse"];
 const GENDER_OPTIONS = [
   { value: "male", label: "Male" },
   { value: "female", label: "Female" },
   { value: "other", label: "Other" },
 ];
-const SOURCE_OPTIONS = ["Walk-in", "Patient Reference", "Doctor Reference", "Website", "Social Media", "Other"];
 const STATUS_OPTIONS = [
   { value: "active", label: "Active" },
   { value: "on-leave", label: "On Leave" },
   { value: "inactive", label: "Inactive" },
 ];
+const ACCOUNT_TYPES = ["Savings", "Current", "Salary", "NRI"];
 
 function dateInputValue(value) {
   return value ? String(value).slice(0, 10) : "";
@@ -41,10 +43,40 @@ function buildDoctorName(values) {
   return [values.titlePrefix, values.firstName, values.lastName].filter(Boolean).join(" ").trim();
 }
 
+function doctorAddressFromRecord(r) {
+  if (!r) return "";
+  if (r.address1 && !r.address2 && !r.pincode && !r.location) return r.address1;
+  return [r.address1, r.address2, r.location, r.pincode].filter(Boolean).join(", ");
+}
+
 const optionObjects = (items) => items.map((value) => ({ value, label: value }));
 
+function yearFromMaybe(value) {
+  const s = String(value || "").trim();
+  if (!s) return null;
+  const n = Number(s);
+  if (Number.isFinite(n) && n >= 1900 && n <= 2100) return n;
+  const m = s.match(/(19\d{2}|20\d{2}|2100)/);
+  return m ? Number(m[1]) : null;
+}
+
+function formatAvailability(availability) {
+  if (!Array.isArray(availability) || availability.length === 0) return "-";
+  const dayLabel = { mon: "Mon", tue: "Tue", wed: "Wed", thu: "Thu", fri: "Fri", sat: "Sat", sun: "Sun" };
+  const grouped = availability.reduce((acc, s) => {
+    if (!s?.day) return acc;
+    acc[s.day] = acc[s.day] || [];
+    acc[s.day].push(`${s.from || ""}-${s.to || ""}`.replace(/^-|-$/g, ""));
+    return acc;
+  }, {});
+  const parts = Object.keys(dayLabel)
+    .filter((d) => grouped[d]?.length)
+    .map((d) => `${dayLabel[d]}: ${grouped[d].filter(Boolean).join(", ")}`);
+  return parts.join(" | ") || "-";
+}
+
 export default function Doctors() {
-  const branches = useOptions("branches", (b) => ({ value: b._id, label: b.name }));
+  const [dashKey, setDashKey] = useState(0);
 
   return (
     <CrudPage
@@ -53,10 +85,22 @@ export default function Doctors() {
       endpoint="doctors"
       singular="Doctor"
       wideForm
-      hideDefaultFooter={false}
+      hideDefaultFooter
       statusOptions={STATUS_OPTIONS}
+      onChanged={() => setDashKey((k) => k + 1)}
+      topContent={
+        <PageDashboard
+          resource="doctors"
+          refreshKey={dashKey}
+          cards={[
+            { key: "total", label: "Total Doctors", icon: "👨‍⚕️" },
+            { key: "active", label: "Active", icon: "✅" },
+            { key: "onLeave", label: "On Leave", icon: "🏖️" },
+          ]}
+        />
+      }
       defaultValues={{
-        titlePrefix: "Baby.",
+        titlePrefix: "Dr.",
         lastNamePrefix: "D/o",
         altPhoneRelation: "Father",
         gender: "male",
@@ -71,43 +115,65 @@ export default function Doctors() {
               {r.image ? <img className="av av-img" src={r.image} alt={r.name} /> : <div className="av">{(r.name || "").slice(0, 2)}</div>}
               <div>
                 <div className="cell-main">{r.name}</div>
-                <div className="cell-sub">{r.location || "-"}</div>
+                <div className="cell-sub">{doctorAddressFromRecord(r) || "-"}</div>
               </div>
             </div>
           ),
         },
         { key: "branch", header: "Branch", render: (r) => r.branch?.name || "-" },
         { key: "phone", header: "Phone", render: (r) => r.phone || "-" },
+        { key: "upid", header: "UPID", render: (r) => r.upid || "-" },
+        { key: "dciRegNo", header: "DCI Reg", render: (r) => r.dciRegNo || "-" },
         { key: "email", header: "Email", render: (r) => r.email || "-" },
         { key: "status", header: "Status", render: (r) => <Badge value={r.status} /> },
       ]}
       fields={() => []}
       renderForm={({ values, setValues }) => (
-        <DoctorForm values={values} setValues={setValues} branches={branches} />
+        <DoctorWizardForm values={values} setValues={setValues} />
       )}
-      toForm={(r) => ({
-        titlePrefix: r.titlePrefix || "Baby.",
-        firstName: r.firstName || r.name || "",
-        lastNamePrefix: r.lastNamePrefix || "D/o",
-        lastName: r.lastName || "",
-        phone: r.phone || "",
-        altPhoneRelation: r.altPhoneRelation || "Father",
-        alternativePhone: r.alternativePhone || "",
-        landline: r.landline || "",
-        email: r.email || "",
-        gender: r.gender || "male",
-        dob: dateInputValue(r.dob),
-        age: r.age ?? "",
-        location: r.location || "",
-        address1: r.address1 || "",
-        address2: r.address2 || "",
-        pincode: r.pincode || "",
-        sourceOfReference: r.sourceOfReference || "",
-        referenceBy: r.referenceBy || "",
-        branch: r.branch?._id || "",
-        status: r.status || "active",
-        image: r.image || "",
-      })}
+      toForm={(r) => {
+        const dob = dateInputValue(r.dob);
+        const bdsYear = r?.degrees?.bdsYear ?? yearFromMaybe(r?.degrees?.bds);
+        const mdsYear = r?.degrees?.mdsYear ?? yearFromMaybe(r?.degrees?.mds);
+        return {
+          titlePrefix: r.titlePrefix || "Dr.",
+          firstName: r.firstName || r.name || "",
+          lastNamePrefix: r.lastNamePrefix || "D/o",
+          lastName: r.lastName || "",
+          phone: r.phone || "",
+          altPhoneRelation: r.altPhoneRelation || "Father",
+          alternativePhone: r.alternativePhone || "",
+          landline: r.landline || "",
+          email: r.email || "",
+          gender: r.gender || "male",
+          dob,
+          age: dob ? ageFromDob(dob) : (r.age ?? ""),
+          address: doctorAddressFromRecord(r),
+          branch: r.branch?._id || "",
+          status: r.status || "active",
+          image: r.image || "",
+
+          upid: r.upid || "",
+          qualification: r.qualification || "",
+          degrees: {
+            ...(r.degrees || {}),
+            bdsYear: bdsYear ?? null,
+            mdsYear: mdsYear ?? null,
+          },
+          dciRegNo: r.dciRegNo || "",
+          specialization: r.specialization || "",
+          feeStructure: r.feeStructure || [],
+          availability: r.availability || [],
+
+          accountHolderName: r.accountHolderName || "",
+          accountNumber: r.accountNumber || "",
+          accountType: r.accountType || "",
+          bankName: r.bankName || "",
+          bankBranchName: r.bankBranchName || "",
+          ifscCode: r.ifscCode || "",
+          upiId: r.upiId || "",
+        };
+      }}
       toPayload={(v) => ({
         name: buildDoctorName(v),
         titlePrefix: v.titlePrefix || "",
@@ -121,16 +187,28 @@ export default function Doctors() {
         email: v.email || "",
         gender: v.gender || "",
         dob: v.dob || null,
-        age: v.age === "" ? 0 : v.age,
-        location: v.location || "",
-        address1: v.address1 || "",
-        address2: v.address2 || "",
-        pincode: v.pincode || "",
-        sourceOfReference: v.sourceOfReference || "",
-        referenceBy: v.referenceBy || "",
+        age: v.dob ? (ageFromDob(v.dob) || 0) : (v.age === "" ? 0 : Number(v.age)),
+        location: "",
+        address1: v.address || "",
+        address2: "",
+        pincode: "",
         branch: v.branch || null,
         status: v.status || "active",
         image: v.image || "",
+        qualification: v.qualification || "",
+        degrees: v.degrees || {},
+        dciRegNo: v.dciRegNo || "",
+        specialization: v.specialization || "",
+        availability: v.availability || [],
+        feeStructure: v.feeStructure || [],
+
+        accountHolderName: v.accountHolderName || "",
+        accountNumber: v.accountNumber || "",
+        accountType: v.accountType || "",
+        bankName: v.bankName || "",
+        bankBranchName: v.bankBranchName || "",
+        ifscCode: v.ifscCode || "",
+        upiId: v.upiId || "",
       })}
       renderView={(r) => (
         <DetailGrid>
@@ -144,13 +222,31 @@ export default function Doctors() {
           <DetailItem label="Email" value={r.email} />
           <DetailItem label="Gender" value={r.gender} />
           <DetailItem label="Date of Birth" value={r.dob ? new Date(r.dob).toLocaleDateString("en-IN") : "-"} />
-          <DetailItem label="Age" value={r.age} />
-          <DetailItem label="Location" value={r.location} />
-          <DetailItem label="Address1" value={r.address1} />
-          <DetailItem label="Address2" value={r.address2} />
-          <DetailItem label="Pincode" value={r.pincode} />
-          <DetailItem label="Source Of Reference" value={r.sourceOfReference} />
-          <DetailItem label="Reference By" value={r.referenceBy} />
+          <DetailItem label="Age" value={r.dob ? ageFromDob(r.dob) : r.age} />
+          <DetailItem label="Address" value={doctorAddressFromRecord(r) || "-"} full />
+          <DetailItem label="UPID" value={r.upid} />
+          <DetailItem label="Qualification" value={r.qualification || "-"} />
+          <DetailItem label="DCI Registration" value={r.dciRegNo} />
+          <DetailItem label="BDS Passing Out Year" value={r.degrees?.bdsYear ?? "-"} />
+          <DetailItem label="MDS Passing Out Year" value={r.degrees?.mdsYear ?? "-"} />
+          <DetailItem label="Specialization" value={r.specialization} />
+          <DetailItem
+            label="Fee Structure"
+            value={
+              (r.feeStructure || []).length
+                ? (r.feeStructure || []).map((x) => `${x.procedure || "Procedure"} — ₹${Number(x.fee || 0)}`).join(", ")
+                : "-"
+            }
+            full
+          />
+          <DetailItem label="Availability" value={formatAvailability(r.availability)} full />
+          <DetailItem label="Account Holder Name" value={r.accountHolderName || "-"} />
+          <DetailItem label="Account Number" value={r.accountNumber || "-"} />
+          <DetailItem label="Account Type" value={r.accountType || "-"} />
+          <DetailItem label="Bank Name" value={r.bankName || "-"} />
+          <DetailItem label="Bank Branch Name" value={r.bankBranchName || "-"} />
+          <DetailItem label="IFSC Code" value={r.ifscCode || "-"} />
+          <DetailItem label="UPI ID" value={r.upiId || "-"} />
           <DetailItem label="Branch" value={r.branch?.name} />
           <DetailItem label="Status" value={<Badge value={r.status} />} />
           {r.image && <DetailItem label="Image" value={<a href={r.image} target="_blank" rel="noreferrer">View image</a>} />}
@@ -160,15 +256,28 @@ export default function Doctors() {
   );
 }
 
-function DoctorForm({ values, setValues, branches }) {
+function DoctorWizardForm({ values, setValues }) {
   const toast = useToast();
   const [uploading, setUploading] = useState(false);
+  const [procedures, setProcedures] = useState([]);
+  const [step, setStep] = useState(0); // 0 = Basic, 1 = Professional
   const computedAge = useMemo(() => ageFromDob(values.dob), [values.dob]);
 
   useEffect(() => {
     if (!values.dob || computedAge === "" || values.age === computedAge) return;
     setValues({ ...values, age: computedAge });
   }, [computedAge, setValues, values]);
+
+  // reset wizard when opening a new record / edit
+  useEffect(() => {
+    setStep(0);
+  }, [values?.upid, values?.email, values?.phone]);
+
+  useEffect(() => {
+    api.get("/procedures", { params: { limit: 500, status: "active" } })
+      .then(({ data }) => setProcedures(data?.data || []))
+      .catch(() => setProcedures([]));
+  }, []);
 
   function set(name, value) {
     setValues({ ...values, [name]: value });
@@ -189,106 +298,340 @@ function DoctorForm({ values, setValues, branches }) {
     }
   }
 
+  function vreq(label, ok) {
+    if (ok) return true;
+    toast.error(`${label} is required`);
+    return false;
+  }
+
+  function validateStep(nextStep) {
+    if (nextStep === 1) {
+      return (
+        vreq("Name", String(values.firstName || "").trim()) &&
+        vreq("Phone number", String(values.phone || "").trim()) &&
+        vreq("Email", String(values.email || "").trim()) &&
+        vreq("Gender", String(values.gender || "").trim()) &&
+        vreq("Date of birth", String(values.dob || "").trim()) &&
+        vreq("Address", String(values.address || "").trim()) &&
+        vreq("Branch", String(values.branch || "").trim())
+      );
+    }
+
+    // final submit validation (professional)
+    return (
+      vreq("Qualification", String(values.qualification || "").trim()) &&
+      vreq("BDS passing out year", Number.isFinite(values?.degrees?.bdsYear) ? values.degrees.bdsYear : String(values?.degrees?.bdsYear || "").trim()) &&
+      vreq("Account holder name", String(values.accountHolderName || "").trim()) &&
+      vreq("Account number", String(values.accountNumber || "").trim()) &&
+      vreq("Account type", String(values.accountType || "").trim()) &&
+      vreq("Bank name", String(values.bankName || "").trim()) &&
+      vreq("Bank branch name", String(values.bankBranchName || "").trim()) &&
+      vreq("IFSC code", String(values.ifscCode || "").trim())
+    );
+  }
+
   return (
-    <div className="doctor-form">
-      <div className="form-grid">
-        <Field label="Name" req>
-          <div className="input-pair select-first">
-            <select value={values.titlePrefix || "Baby."} onChange={(e) => set("titlePrefix", e.target.value)}>
-              {optionObjects(TITLE_OPTIONS).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-            <input value={values.firstName || ""} onChange={(e) => set("firstName", e.target.value)} placeholder="Enter Name" required />
-          </div>
-        </Field>
-        <Field label="Last Name">
-          <div className="input-pair select-first">
-            <select value={values.lastNamePrefix || "D/o"} onChange={(e) => set("lastNamePrefix", e.target.value)}>
-              {optionObjects(RELATION_OPTIONS).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-            <input value={values.lastName || ""} onChange={(e) => set("lastName", e.target.value)} placeholder="Enter Last Name" />
-          </div>
-        </Field>
-        <Field label="Phone Number" req>
-          <input value={values.phone || ""} onChange={(e) => set("phone", e.target.value)} placeholder="Enter Phone Number" required />
-        </Field>
-        <Field label="Alternative Phone Number">
-          <div className="input-pair select-first">
-            <select value={values.altPhoneRelation || "Father"} onChange={(e) => set("altPhoneRelation", e.target.value)}>
-              {optionObjects(ALT_RELATION_OPTIONS).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-            <input value={values.alternativePhone || ""} onChange={(e) => set("alternativePhone", e.target.value)} placeholder="Enter Alternative Phone" />
-          </div>
-        </Field>
-        <Field label="Land Line Number">
-          <input value={values.landline || ""} onChange={(e) => set("landline", e.target.value)} placeholder="Land Line Number" />
-        </Field>
-        <Field label="Email" req>
-          <input type="email" value={values.email || ""} onChange={(e) => set("email", e.target.value)} placeholder="Enter Email" required />
-        </Field>
-        <Field label="Gender" req>
-          <select value={values.gender || "male"} onChange={(e) => set("gender", e.target.value)} required>
-            {GENDER_OPTIONS.map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
-          </select>
-        </Field>
-        <div className="form-grid compact-row">
-          <Field label="Date of Birth" req>
-            <input type="date" value={values.dob || ""} onChange={(e) => set("dob", e.target.value)} required />
-          </Field>
-          <Field label="Age">
-            <input
-              type="number"
-              min={0}
-              value={values.age ?? ""}
-              onChange={(e) => set("age", e.target.value === "" ? "" : Number(e.target.value))}
-              placeholder="Enter Age"
-            />
-          </Field>
+    <div
+      className="doctor-form"
+      onKeyDown={(e) => {
+        // Prevent accidental form submit (Enter) on step 1 navigation.
+        // The form submit should only happen from the explicit "Save Doctor" action.
+        if (e.key === "Enter" && step === 0) e.preventDefault();
+      }}
+    >
+      <div className="wizard-header">
+        <div className="wizard-steps" role="tablist" aria-label="Doctor form steps">
+          <button
+            type="button"
+            className={`wizard-step ${step === 0 ? "active" : ""}`}
+            onClick={(e) => {
+              e.preventDefault();
+              setStep(0);
+            }}
+          >
+            <span className="n">1</span> Basic details
+          </button>
+          <button
+            type="button"
+            className={`wizard-step ${step === 1 ? "active" : ""}`}
+            onClick={(e) => {
+              e.preventDefault();
+              if (step === 0 && !validateStep(1)) return;
+              setStep(1);
+            }}
+          >
+            <span className="n">2</span> Professional details
+          </button>
         </div>
-        <Field label="Location" req>
-          <input value={values.location || ""} onChange={(e) => set("location", e.target.value)} placeholder="Enter Location" required />
-        </Field>
-        <Field label="Address1">
-          <input value={values.address1 || ""} onChange={(e) => set("address1", e.target.value)} placeholder="Enter Address Line 1" />
-        </Field>
-        <Field label="Address2">
-          <input value={values.address2 || ""} onChange={(e) => set("address2", e.target.value)} placeholder="Enter Address Line 2" />
-        </Field>
-        <Field label="Pincode">
-          <input value={values.pincode || ""} onChange={(e) => set("pincode", e.target.value)} placeholder="Pincode" />
-        </Field>
-        <Field label="Source Of Reference" req>
-          <select value={values.sourceOfReference || ""} onChange={(e) => set("sourceOfReference", e.target.value)} required>
-            <option value="">Select Source Of Reference</option>
-            {optionObjects(SOURCE_OPTIONS).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-        </Field>
-        <Field label="Reference By">
-          <input value={values.referenceBy || ""} onChange={(e) => set("referenceBy", e.target.value)} placeholder="Reference By" />
-        </Field>
-        <Field label="Branch">
-          <select value={values.branch || ""} onChange={(e) => set("branch", e.target.value)}>
-            <option value="">Select Branch</option>
-            {branches.map((b) => <option key={b.value} value={b.value}>{b.label}</option>)}
-          </select>
-        </Field>
-        <Field label="Status">
-          <select value={values.status || "active"} onChange={(e) => set("status", e.target.value)}>
-            {STATUS_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-          </select>
-        </Field>
       </div>
 
-      <div className="doctor-image-row">
-        <div className="field">
-          <label>Image</label>
-          <label className="doctor-browse">
-            {uploading ? "Uploading..." : "Browse"}
-            <input type="file" accept="image/*" hidden onChange={(e) => uploadImage(e.target.files?.[0])} />
-          </label>
-        </div>
-        <div className="doctor-avatar-preview">
-          {values.image ? <img src={values.image} alt="Doctor" /> : <span />}
-        </div>
+      {step === 0 && (
+        <>
+          <div className="form-grid">
+            <Field label="Name" req>
+              <div className="input-pair select-first">
+                <select value={values.titlePrefix || "Dr."} onChange={(e) => set("titlePrefix", e.target.value)}>
+                  {optionObjects(TITLE_OPTIONS).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+                <input value={values.firstName || ""} onChange={(e) => set("firstName", e.target.value)} placeholder="Enter Name" />
+              </div>
+            </Field>
+            <Field label="Last Name">
+              <div className="input-pair select-first">
+                <select value={values.lastNamePrefix || "D/o"} onChange={(e) => set("lastNamePrefix", e.target.value)}>
+                  {optionObjects(RELATION_OPTIONS).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+                <input value={values.lastName || ""} onChange={(e) => set("lastName", e.target.value)} placeholder="Enter Last Name" />
+              </div>
+            </Field>
+            <Field label="Phone Number" req>
+              <input value={values.phone || ""} onChange={(e) => set("phone", e.target.value)} placeholder="Enter Phone Number" />
+            </Field>
+            <Field label="Alternative Phone Number">
+              <div className="input-pair select-first">
+                <select value={values.altPhoneRelation || "Father"} onChange={(e) => set("altPhoneRelation", e.target.value)}>
+                  {optionObjects(ALT_RELATION_OPTIONS).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+                <input value={values.alternativePhone || ""} onChange={(e) => set("alternativePhone", e.target.value)} placeholder="Enter Alternative Phone" />
+              </div>
+            </Field>
+            <Field label="Land Line Number">
+              <input value={values.landline || ""} onChange={(e) => set("landline", e.target.value)} placeholder="Land Line Number" />
+            </Field>
+            <Field label="Email" req>
+              <input type="email" value={values.email || ""} onChange={(e) => set("email", e.target.value)} placeholder="Enter Email" />
+            </Field>
+            <Field label="Gender" req>
+              <select value={values.gender || "male"} onChange={(e) => set("gender", e.target.value)}>
+                {GENDER_OPTIONS.map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
+              </select>
+            </Field>
+            <div className="form-grid compact-row">
+              <Field label="Date of Birth" req>
+                <input
+                  type="date"
+                  value={values.dob || ""}
+                  onChange={(e) => {
+                    const dob = e.target.value;
+                    setValues({
+                      ...values,
+                      dob,
+                      age: dob ? ageFromDob(dob) : values.age,
+                    });
+                  }}
+                />
+              </Field>
+              <Field label="Age">
+                <input
+                  type="number"
+                  min={0}
+                  value={values.dob ? computedAge : (values.age ?? "")}
+                  readOnly={!!values.dob}
+                  disabled={!!values.dob}
+                  onChange={(e) => set("age", e.target.value === "" ? "" : Number(e.target.value))}
+                  placeholder={values.dob ? "" : "Enter Age"}
+                />
+              </Field>
+            </div>
+            <Field label="Address" req>
+              <input value={values.address || ""} onChange={(e) => set("address", e.target.value)} placeholder="Enter Address" />
+            </Field>
+            <ClinicBranchField
+              value={values.branch || ""}
+              onChange={(branchId) => set("branch", branchId)}
+              includeClinicName
+            />
+            <Field label="Status">
+              <select value={values.status || "active"} onChange={(e) => set("status", e.target.value)}>
+                {STATUS_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+              </select>
+            </Field>
+          </div>
+        </>
+      )}
+
+      {step === 1 && (
+        <>
+          <h4 className="staff-form-section">Professional Details</h4>
+          <div className="form-grid">
+            <Field label="UPID">
+              <input value={values.upid || ""} readOnly placeholder="Auto-generated" />
+            </Field>
+            <Field label="Qualification" req>
+              <input value={values.qualification || ""} onChange={(e) => set("qualification", e.target.value)} placeholder="e.g. BDS, MDS" />
+            </Field>
+            <Field label="DCI Registration No">
+              <input value={values.dciRegNo || ""} onChange={(e) => set("dciRegNo", e.target.value)} placeholder="DCI number" />
+            </Field>
+            <Field label="BDS Passing Out Year" req>
+              <input
+                type="number"
+                min={1900}
+                max={2100}
+                value={values.degrees?.bdsYear ?? ""}
+                onChange={(e) => set("degrees", { ...values.degrees, bdsYear: e.target.value === "" ? null : Number(e.target.value) })}
+                placeholder="e.g. 2018"
+              />
+            </Field>
+            <Field label="MDS Passing Out Year">
+              <input
+                type="number"
+                min={1900}
+                max={2100}
+                value={values.degrees?.mdsYear ?? ""}
+                onChange={(e) => set("degrees", { ...values.degrees, mdsYear: e.target.value === "" ? null : Number(e.target.value) })}
+                placeholder="e.g. 2021"
+              />
+            </Field>
+            <Field label="Specialization">
+              <input value={values.specialization || ""} onChange={(e) => set("specialization", e.target.value)} />
+            </Field>
+          </div>
+
+          <h4 className="staff-form-section">Fee Structure</h4>
+          <div className="fee-structure">
+            {(values.feeStructure || []).map((row, i) => (
+              <div key={i} className="fee-structure-row">
+                <Field label="Procedure" req>
+                  <select
+                    value={row.procedureRef || ""}
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      const proc = procedures.find((p) => p._id === id);
+                      const next = [...(values.feeStructure || [])];
+                      next[i] = {
+                        ...next[i],
+                        procedureRef: id || null,
+                        procedure: proc?.name || next[i]?.procedure || "",
+                        fee: Number(proc?.charge ?? next[i]?.fee ?? 0),
+                      };
+                      set("feeStructure", next);
+                    }}
+                  >
+                    <option value="">Select Procedure</option>
+                    {procedures.map((p) => (
+                      <option key={p._id} value={p._id}>
+                        {p.name} — ₹{Number(p.charge || 0)}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Fee (₹)" req>
+                  <input
+                    type="number"
+                    min={0}
+                    value={row.fee ?? 0}
+                    onChange={(e) => {
+                      const next = [...(values.feeStructure || [])];
+                      next[i] = { ...next[i], fee: Number(e.target.value) };
+                      set("feeStructure", next);
+                    }}
+                  />
+                </Field>
+                <div className="fee-structure-actions">
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => set("feeStructure", (values.feeStructure || []).filter((_, idx) => idx !== i))}
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ))}
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={() => set("feeStructure", [...(values.feeStructure || []), { procedureRef: null, procedure: "", fee: 0 }])}
+            >
+              + Add procedure
+            </button>
+          </div>
+
+          <h4 className="staff-form-section">Bank Details</h4>
+          <div className="form-grid">
+            <Field label="Account Holder Name" req>
+              <input value={values.accountHolderName || ""} onChange={(e) => set("accountHolderName", e.target.value)} placeholder="Enter Account Holder Name" />
+            </Field>
+            <Field label="Account Number" req>
+              <input value={values.accountNumber || ""} onChange={(e) => set("accountNumber", e.target.value)} />
+            </Field>
+            <Field label="Account Type" req>
+              <select value={values.accountType || ""} onChange={(e) => set("accountType", e.target.value)}>
+                <option value="">Select Account Type</option>
+                {optionObjects(ACCOUNT_TYPES).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </Field>
+            <Field label="Bank Name" req>
+              <input value={values.bankName || ""} onChange={(e) => set("bankName", e.target.value)} placeholder="Enter Bank Name" />
+            </Field>
+            <Field label="Bank Branch Name" req>
+              <input value={values.bankBranchName || ""} onChange={(e) => set("bankBranchName", e.target.value)} placeholder="Enter Branch Name" />
+            </Field>
+            <Field label="IFSC Code" req>
+              <input value={values.ifscCode || ""} onChange={(e) => set("ifscCode", e.target.value.toUpperCase())} placeholder="Enter IFSC Code" />
+            </Field>
+            <Field label="UPI ID">
+              <input value={values.upiId || ""} onChange={(e) => set("upiId", e.target.value)} placeholder="e.g. name@bank" />
+            </Field>
+          </div>
+
+          <h4 className="staff-form-section">Availability</h4>
+          <BusinessHoursEditor
+            value={(values.weeklySchedule && values.weeklySchedule.length ? values.weeklySchedule : values.availability) || []}
+            onChange={(next) => {
+              set("weeklySchedule", next.weeklySchedule || []);
+              set("availability", next.availability || []);
+            }}
+          />
+
+          <div className="form-grid">
+            <div className="field">
+              <label>Image</label>
+              <label className="doctor-browse">
+                {uploading ? "Uploading..." : "Browse"}
+                <input type="file" accept="image/*" hidden onChange={(e) => uploadImage(e.target.files?.[0])} />
+              </label>
+            </div>
+            <div className="doctor-avatar-preview">
+              {values.image ? <img src={values.image} alt="Doctor" /> : <span />}
+            </div>
+          </div>
+        </>
+      )}
+
+      <div className="wizard-nav">
+        {step === 0 ? (
+          <>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={(e) => {
+                e.preventDefault();
+                if (!validateStep(1)) return;
+                setStep(1);
+              }}
+            >
+              Next
+            </button>
+          </>
+        ) : (
+          <>
+            <button type="button" className="btn btn-ghost" onClick={() => setStep(0)}>
+              Back
+            </button>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              onClick={(e) => {
+                // if professional step invalid, stop form submit
+                if (!validateStep(2)) e.preventDefault();
+              }}
+            >
+              Save Doctor
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

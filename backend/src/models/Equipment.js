@@ -4,6 +4,7 @@ const equipmentSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
     type: { type: String, enum: ["dental-chair", "xray-machine", "scanner", "autoclave", "other"], default: "other" },
+    units: { type: Number, default: 1 },
     branch: { type: mongoose.Schema.Types.ObjectId, ref: "Branch" },
     purchaseDate: { type: Date },
     lastServiceDate: { type: Date },

@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: evident-dental-api
+    name: denta-cloud-api
     runtime: node
     rootDir: backend
     buildCommand: npm install

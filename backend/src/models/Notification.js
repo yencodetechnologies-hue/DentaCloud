@@ -4,7 +4,7 @@ const notificationSchema = new mongoose.Schema(
   {
     type: {
       type: String,
-      enum: ["appointment-reminder", "followup-reminder", "payment-reminder", "stock-expiry", "equipment-service"],
+      enum: ["appointment-reminder", "followup-reminder", "payment-reminder", "stock-expiry", "equipment-service", "thank-you"],
       required: true,
     },
     channel: { type: String, enum: ["sms", "whatsapp", "email", "push"], required: true },

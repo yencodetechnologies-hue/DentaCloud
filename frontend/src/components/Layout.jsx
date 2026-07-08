@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { Outlet, NavLink, useLocation } from "react-router-dom";
 import { MENU } from "../config/menu.js";
 import { useAuth } from "../context/AuthContext.jsx";
+import useUserBranch from "../hooks/useUserBranch.js";
+import ActiveBranchSelect from "./ActiveBranchSelect.jsx";
 
 function initials(name = "") {
   return name.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
@@ -12,6 +14,7 @@ export default function Layout() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { user, logout } = useAuth();
+  const { branchName } = useUserBranch();
   const location = useLocation();
 
   useEffect(() => {
@@ -20,7 +23,12 @@ export default function Layout() {
 
   const current = MENU.find((m) => m.path === location.pathname);
   const roleLabel = (user?.role || "dental-admin").replace("-", " ");
-  const visibleMenu = MENU.filter((item) => item.section || !item.roles || item.roles.includes(user?.role));
+  const visibleMenu = MENU.filter((item) => {
+    if (item.accountTypes && !item.accountTypes.includes(user?.accountType || "clinic")) return false;
+    if (item.section) return true;
+    if (item.roles && !item.roles.includes(user?.role)) return false;
+    return true;
+  });
   // drop section headers that end up with no visible items under them
   const menu = visibleMenu.filter((item, i) => {
     if (!item.section) return true;
@@ -42,15 +50,16 @@ export default function Layout() {
             </svg>
           </div>
           <div className="brand-text">
-            <div className="name">Evident Dental</div>
+            <div className="name">Denta Cloud</div>
             <div className="sub">CLINIC OS · v3.2</div>
           </div>
         </div>
 
-        <div className="branch-pill" title="Switch branch">
-          <span className="lbl"><span className="dot"></span>Chennai · All Branches</span>
-          <span className="chev">▾</span>
-        </div>
+        {branchName && (
+          <div className="branch-pill" title="Your clinic">
+            <span className="lbl"><span className="dot"></span>{branchName}</span>
+          </div>
+        )}
 
         <nav className="nav-scroll">
           {menu.map((item, i) =>
@@ -98,6 +107,7 @@ export default function Layout() {
             </div>
           </div>
           <div className="topbar-right">
+            <ActiveBranchSelect />
             <div className="search-box">
               <span>🔍</span>
               <input type="text" placeholder="Search patients, doctors, invoices..." />

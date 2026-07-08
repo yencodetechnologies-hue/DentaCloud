@@ -1,7 +1,7 @@
 {
-  "name": "evident-dental-server",
+  "name": "denta-cloud-server",
   "version": "1.0.0",
-  "description": "Evident Dental admin panel API",
+  "description": "Denta Cloud admin panel API",
   "type": "module",
   "main": "src/index.js",
   "scripts": {
@@ -17,6 +17,8 @@
     "express": "^4.19.2",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.5.1",
-    "multer": "^2.2.0"
+    "multer": "^2.2.0",
+    "node-cron": "^3.0.3",
+    "nodemailer": "^6.9.14"
   }
 }

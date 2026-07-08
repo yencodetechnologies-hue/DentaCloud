@@ -1,8 +1,12 @@
 import CrudPage from "../components/CrudPage.jsx";
+import PageDashboard from "../components/PageDashboard.jsx";
 import Badge from "../components/Badge.jsx";
+import useOptions from "../hooks/useOptions.js";
 import { DetailGrid, DetailItem } from "../components/Detail.jsx";
 
 export default function Branches() {
+  const enterprises = useOptions("enterprises", (e) => ({ value: e._id, label: e.name }));
+
   return (
     <CrudPage
       title="Branches"
@@ -11,6 +15,16 @@ export default function Branches() {
       singular="Branch"
       statusOptions={[{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }]}
       defaultValues={{ status: "active" }}
+      topContent={
+        <PageDashboard
+          resource="branches"
+          cards={[
+            { key: "total", label: "Total Branches", icon: "🏢" },
+            { key: "active", label: "Active", icon: "✅", bg: "#E3FBF6" },
+            { key: "inactive", label: "Inactive", icon: "⏸️", bg: "#FFEDEB" },
+          ]}
+        />
+      }
       columns={[
         {
           key: "name",
@@ -25,12 +39,14 @@ export default function Branches() {
             </div>
           ),
         },
+        { key: "enterprise", header: "Enterprise", render: (r) => r.enterprise?.name || "—" },
         { key: "manager", header: "Manager", render: (r) => r.manager || "—" },
         { key: "phone", header: "Phone", render: (r) => r.phone || "—" },
         { key: "email", header: "Email", render: (r) => r.email || "—" },
         { key: "status", header: "Status", render: (r) => <Badge value={r.status} /> },
       ]}
       fields={[
+        { name: "enterprise", label: "Enterprise", type: "select", options: enterprises },
         { name: "name", label: "Branch Name", required: true },
         { name: "code", label: "Branch Code", required: true, placeholder: "e.g. ADY" },
         { name: "city", label: "City" },
@@ -40,9 +56,24 @@ export default function Branches() {
         { name: "address", label: "Address", type: "textarea", full: true },
         { name: "status", label: "Status", type: "select", options: [{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }] },
       ]}
-      toForm={(r) => ({ name: r.name, code: r.code, city: r.city, phone: r.phone, email: r.email, manager: r.manager, address: r.address, status: r.status })}
+      toForm={(r) => ({
+        enterprise: r.enterprise?._id || "",
+        name: r.name,
+        code: r.code,
+        city: r.city,
+        phone: r.phone,
+        email: r.email,
+        manager: r.manager,
+        address: r.address,
+        status: r.status,
+      })}
+      toPayload={(v) => ({
+        ...v,
+        enterprise: v.enterprise || null,
+      })}
       renderView={(r) => (
         <DetailGrid>
+          <DetailItem label="Enterprise" value={r.enterprise?.name} />
           <DetailItem label="Branch Name" value={r.name} />
           <DetailItem label="Code" value={r.code} />
           <DetailItem label="City" value={r.city} />

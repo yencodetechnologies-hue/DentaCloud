@@ -1,4 +1,5 @@
 import CrudPage from "../components/CrudPage.jsx";
+import PageDashboard from "../components/PageDashboard.jsx";
 import Badge from "../components/Badge.jsx";
 import useOptions from "../hooks/useOptions.js";
 import { DetailGrid, DetailItem } from "../components/Detail.jsx";
@@ -23,7 +24,6 @@ function toDateInput(d) {
 export default function Appointments() {
   const patients = useOptions("patients", (p) => ({ value: p._id, label: p.name }));
   const doctors = useOptions("doctors", (d) => ({ value: d._id, label: d.name }));
-  const branches = useOptions("branches", (b) => ({ value: b._id, label: b.name }));
 
   return (
     <CrudPage
@@ -33,6 +33,16 @@ export default function Appointments() {
       singular="Appointment"
       statusOptions={STATUS}
       defaultValues={{ status: "scheduled", date: toDateInput(new Date()) }}
+      topContent={
+        <PageDashboard
+          resource="appointments"
+          cards={[
+            { key: "today", label: "Today", icon: "📅" },
+            { key: "completed", label: "Completed Today", icon: "✅" },
+            { key: "total", label: "Total", icon: "📊" },
+          ]}
+        />
+      }
       columns={[
         {
           key: "patient",
@@ -56,7 +66,7 @@ export default function Appointments() {
       fields={() => [
         { name: "patient", label: "Patient", type: "select", options: patients, required: true },
         { name: "doctor", label: "Doctor", type: "select", options: doctors, required: true },
-        { name: "branch", label: "Branch", type: "select", options: branches },
+        { name: "branch", label: "Branch", type: "clinicBranch" },
         { name: "date", label: "Date", type: "date", required: true },
         { name: "time", label: "Time", placeholder: "e.g. 10:30 AM" },
         { name: "treatment", label: "Treatment", placeholder: "e.g. Root Canal" },

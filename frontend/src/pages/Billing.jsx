@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import CrudPage from "../components/CrudPage.jsx";
+import PageDashboard from "../components/PageDashboard.jsx";
 import Badge from "../components/Badge.jsx";
 import useOptions from "../hooks/useOptions.js";
+import ClinicBranchField from "../components/ClinicBranchField.jsx";
 import api, { apiError } from "../api/client.js";
 import { useToast } from "../context/ToastContext.jsx";
 import { DetailGrid, DetailItem } from "../components/Detail.jsx";
@@ -34,7 +36,7 @@ function calcTotals(items, discount) {
   return { subtotal, gst, cgst: gst / 2, sgst: gst / 2, total };
 }
 
-function InvoiceForm({ values, setValues, patients, branches }) {
+function InvoiceForm({ values, setValues, patients, procedures = [] }) {
   const items = values.items || [];
   const payments = values.payments || [];
   const { subtotal, gst, cgst, sgst, total } = calcTotals(items, values.discount);
@@ -43,6 +45,14 @@ function InvoiceForm({ values, setValues, patients, branches }) {
 
   function setItem(i, key, val) {
     const next = items.map((it, idx) => (idx === i ? { ...it, [key]: key === "description" || key === "hsn" ? val : Number(val) } : it));
+    setValues({ ...values, items: next });
+  }
+  function applyProcedure(i, procId) {
+    const proc = procedures.find((p) => p._id === procId);
+    if (!proc) return;
+    const next = items.map((it, idx) =>
+      idx === i ? { ...it, description: proc.name, price: proc.charge, procedureId: procId } : it
+    );
     setValues({ ...values, items: next });
   }
   function addItem() {
@@ -70,13 +80,10 @@ function InvoiceForm({ values, setValues, patients, branches }) {
             {patients.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         </div>
-        <div className="field">
-          <label>Branch</label>
-          <select value={values.branch || ""} onChange={(e) => setValues({ ...values, branch: e.target.value })}>
-            <option value="">Select…</option>
-            {branches.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-        </div>
+        <ClinicBranchField
+          value={values.branch || ""}
+          onChange={(branchId) => setValues({ ...values, branch: branchId })}
+        />
         <div className="field">
           <label>Date</label>
           <input type="date" value={values.date || ""} onChange={(e) => setValues({ ...values, date: e.target.value })} />
@@ -84,11 +91,15 @@ function InvoiceForm({ values, setValues, patients, branches }) {
       </div>
 
       <div style={{ margin: "18px 0 8px", fontWeight: 600, fontSize: 13 }}>Line Items</div>
-      <div className="line-item-row" style={{ gridTemplateColumns: "2fr 1fr 0.7fr 0.9fr 0.7fr auto", fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: ".5px" }}>
-        <span>Description</span><span>HSN</span><span>Qty</span><span>Price</span><span>GST %</span><span></span>
+      <div className="line-item-row" style={{ gridTemplateColumns: "1.2fr 2fr 1fr 0.7fr 0.9fr 0.7fr auto", fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: ".5px" }}>
+        <span>Procedure</span><span>Description</span><span>HSN</span><span>Qty</span><span>Price</span><span>GST %</span><span></span>
       </div>
       {items.map((it, i) => (
-        <div className="line-item-row" style={{ gridTemplateColumns: "2fr 1fr 0.7fr 0.9fr 0.7fr auto" }} key={i}>
+        <div className="line-item-row" style={{ gridTemplateColumns: "1.2fr 2fr 1fr 0.7fr 0.9fr 0.7fr auto" }} key={i}>
+          <select value={it.procedureId || ""} onChange={(e) => applyProcedure(i, e.target.value)}>
+            <option value="">Pick procedure</option>
+            {procedures.map((p) => <option key={p._id} value={p._id}>{p.name} — ₹{p.charge}</option>)}
+          </select>
           <input value={it.description} placeholder="Service / item" onChange={(e) => setItem(i, "description", e.target.value)} />
           <input value={it.hsn || ""} placeholder="HSN/SAC" onChange={(e) => setItem(i, "hsn", e.target.value)} />
           <input type="number" min="0" value={it.qty} onChange={(e) => setItem(i, "qty", e.target.value)} />
@@ -141,8 +152,14 @@ function InvoiceForm({ values, setValues, patients, branches }) {
 
 export default function Billing() {
   const patients = useOptions("patients", (p) => ({ value: p._id, label: p.name }));
-  const branches = useOptions("branches", (b) => ({ value: b._id, label: b.name }));
+  const [procedures, setProcedures] = useState([]);
   const toast = useToast();
+
+  useEffect(() => {
+    api.get("/procedures", { params: { limit: 200, status: "active" } })
+      .then(({ data }) => setProcedures(data.data || []))
+      .catch(() => {});
+  }, []);
 
   async function logPaymentReminder(r) {
     try {
@@ -168,6 +185,16 @@ export default function Billing() {
       subtitle="Create invoices, apply GST and track patient payments."
       endpoint="invoices"
       singular="Invoice"
+      topContent={
+        <PageDashboard
+          resource="invoices"
+          cards={[
+            { key: "total", label: "Total Invoices", icon: "💳" },
+            { key: "todayRevenue", label: "Collected Today", icon: "💰", prefix: "₹" },
+            { key: "unpaid", label: "Unpaid / Partial", icon: "⚠️" },
+          ]}
+        />
+      }
       statusOptions={[{ value: "paid", label: "Paid" }, { value: "partial", label: "Partial" }, { value: "unpaid", label: "Unpaid" }]}
       defaultValues={{ date: toDateInput(new Date()), items: [{ description: "", hsn: "", qty: 1, price: 0, gstRate: 0 }], discount: 0, payments: [] }}
       columns={[
@@ -192,7 +219,7 @@ export default function Billing() {
       fields={[]}
       wideForm
       renderForm={({ values, setValues }) => (
-        <InvoiceForm values={values} setValues={setValues} patients={patients} branches={branches} />
+        <InvoiceForm values={values} setValues={setValues} patients={patients} procedures={procedures} />
       )}
       toForm={(r) => ({
         patient: r.patient?._id || "",

@@ -7,7 +7,7 @@ const cache = globalThis.__mongooseCache ?? { conn: null, promise: null };
 globalThis.__mongooseCache = cache;
 
 async function connectOnce() {
-  const uri = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/evident-dental";
+  const uri = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/denta-cloud";
   mongoose.set("strictQuery", true);
   const opts = { serverSelectionTimeoutMS: 20000 };
 

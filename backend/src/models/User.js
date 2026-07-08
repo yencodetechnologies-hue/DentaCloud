@@ -22,6 +22,21 @@ const userSchema = new mongoose.Schema(
       default: "dental-admin",
     },
     avatar: { type: String, default: "" },
+    enterprise: { type: mongoose.Schema.Types.ObjectId, ref: "Enterprise" },
+    branch: { type: mongoose.Schema.Types.ObjectId, ref: "Branch" },
+    linkedRef: { type: mongoose.Schema.Types.ObjectId, refPath: "linkedModel" },
+    linkedModel: {
+      type: String,
+      enum: ["Doctor", "Staff", "Patient", "Vendor", ""],
+      default: "",
+    },
+    accountType: {
+      type: String,
+      enum: ["clinic", "enterprise"],
+      default: "clinic",
+    },
+    resetPasswordToken: { type: String, select: false },
+    resetPasswordExpires: { type: Date, select: false },
   },
   { timestamps: true }
 );

@@ -1,13 +1,25 @@
 import mongoose from "mongoose";
+import { nextSeq } from "./Counter.js";
+
+const documentSchema = new mongoose.Schema(
+  {
+    name: { type: String, trim: true },
+    url: { type: String, trim: true },
+    type: { type: String, trim: true },
+  },
+  { _id: false }
+);
 
 const staffSchema = new mongoose.Schema(
   {
+    employeeId: { type: String, unique: true, trim: true },
     name: { type: String, required: true, trim: true },
     titlePrefix: { type: String, trim: true },
     firstName: { type: String, trim: true },
     lastNamePrefix: { type: String, trim: true },
     lastName: { type: String, trim: true },
     role: { type: String, trim: true, default: "Receptionist" },
+    designation: { type: String, trim: true },
     email: { type: String, lowercase: true, trim: true },
     phone: { type: String, trim: true },
     altPhoneRelation: { type: String, trim: true },
@@ -21,6 +33,11 @@ const staffSchema = new mongoose.Schema(
     pincode: { type: String, trim: true },
     qualification: { type: String, trim: true },
     image: { type: String, trim: true },
+    joiningDate: { type: Date },
+    weeklyOff: { type: [String], default: [] },
+    jobResponsibilities: { type: String, trim: true },
+    documents: { type: [documentSchema], default: [] },
+    offerLetter: { type: String, trim: true },
     accountHolderName: { type: String, trim: true },
     accountNumber: { type: String, trim: true },
     accountType: { type: String, trim: true },
@@ -34,5 +51,17 @@ const staffSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+staffSchema.pre("validate", async function generateEmployeeId(next) {
+  try {
+    if (!this.employeeId) {
+      const seq = await nextSeq("staffEmployeeId");
+      this.employeeId = `ST-${String(seq).padStart(5, "0")}`;
+    }
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
 
 export default mongoose.model("Staff", staffSchema);

@@ -1,6 +1,6 @@
 import CrudPage from "../components/CrudPage.jsx";
+import PageDashboard from "../components/PageDashboard.jsx";
 import Badge from "../components/Badge.jsx";
-import useOptions from "../hooks/useOptions.js";
 import { DetailGrid, DetailItem } from "../components/Detail.jsx";
 
 const TYPE = [
@@ -25,8 +25,6 @@ function money(n) {
 }
 
 export default function Equipment() {
-  const branches = useOptions("branches", (b) => ({ value: b._id, label: b.name }));
-
   return (
     <CrudPage
       title="Equipment"
@@ -34,7 +32,17 @@ export default function Equipment() {
       endpoint="equipment"
       singular="Equipment"
       statusOptions={STATUS}
-      defaultValues={{ type: "other", status: "active", repairCost: 0 }}
+      defaultValues={{ type: "other", status: "active", repairCost: 0, units: 1 }}
+      topContent={
+        <PageDashboard
+          resource="equipment"
+          cards={[
+            { key: "total", label: "Total Equipment", icon: "🛠️" },
+            { key: "active", label: "Active", icon: "✅" },
+            { key: "underRepair", label: "Under Repair", icon: "🔧" },
+          ]}
+        />
+      }
       columns={[
         { key: "name", header: "Equipment", render: (r) => <span className="cell-main">{r.name}</span> },
         { key: "type", header: "Type", render: (r) => <span style={{ textTransform: "capitalize" }}>{r.type?.replace("-", " ")}</span> },
@@ -46,7 +54,8 @@ export default function Equipment() {
       fields={() => [
         { name: "name", label: "Equipment Name", required: true },
         { name: "type", label: "Type", type: "select", options: TYPE },
-        { name: "branch", label: "Branch", type: "select", options: branches },
+        { name: "units", label: "Units", type: "number", min: 1 },
+        { name: "branch", label: "Branch", type: "clinicBranch" },
         { name: "purchaseDate", label: "Purchase Date", type: "date" },
         { name: "lastServiceDate", label: "Last Service Date", type: "date" },
         { name: "nextServiceDate", label: "Next Service Date", type: "date" },
@@ -58,6 +67,7 @@ export default function Equipment() {
       toForm={(r) => ({
         name: r.name,
         type: r.type,
+        units: r.units ?? 1,
         branch: r.branch?._id || "",
         purchaseDate: r.purchaseDate ? new Date(r.purchaseDate).toISOString().slice(0, 10) : "",
         lastServiceDate: r.lastServiceDate ? new Date(r.lastServiceDate).toISOString().slice(0, 10) : "",
@@ -72,6 +82,7 @@ export default function Equipment() {
         <DetailGrid>
           <DetailItem label="Equipment" value={r.name} />
           <DetailItem label="Type" value={r.type} />
+          <DetailItem label="Units" value={r.units} />
           <DetailItem label="Branch" value={r.branch?.name} />
           <DetailItem label="Purchase Date" value={fmtDate(r.purchaseDate)} />
           <DetailItem label="Last Service" value={fmtDate(r.lastServiceDate)} />

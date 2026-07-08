@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import api, { apiError } from "../api/client.js";
 import { useToast } from "../context/ToastContext.jsx";
+import useUserBranch from "../hooks/useUserBranch.js";
 import DataTable from "./DataTable.jsx";
 import Modal from "./Modal.jsx";
 import ConfirmDialog from "./ConfirmDialog.jsx";
@@ -32,9 +33,11 @@ export default function CrudPage(props) {
     toForm = (r) => r,
     toPayload = (v) => v,
     renderView,
+    onChanged,
   } = props;
 
   const toast = useToast();
+  const { branchId } = useUserBranch();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -78,7 +81,7 @@ export default function CrudPage(props) {
 
   function openCreate() {
     setEditing(null);
-    setValues(defaultValues);
+    setValues(branchId ? { ...defaultValues, branch: branchId } : defaultValues);
     setFormError("");
     setFormOpen(true);
   }
@@ -105,6 +108,7 @@ export default function CrudPage(props) {
       }
       setFormOpen(false);
       load();
+      onChanged?.();
     } catch (err) {
       setFormError(apiError(err));
     } finally {
@@ -120,6 +124,7 @@ export default function CrudPage(props) {
       setDeleting(null);
       if (rows.length === 1 && page > 1) setPage(page - 1);
       else load();
+      onChanged?.();
     } catch (err) {
       toast.error(apiError(err));
     } finally {

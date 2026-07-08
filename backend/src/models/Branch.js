@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 
 const branchSchema = new mongoose.Schema(
   {
+    enterprise: { type: mongoose.Schema.Types.ObjectId, ref: "Enterprise" },
     name: { type: String, required: true, trim: true },
     code: { type: String, required: true, unique: true, uppercase: true, trim: true },
     city: { type: String, trim: true },

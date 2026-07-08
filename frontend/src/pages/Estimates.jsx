@@ -1,7 +1,9 @@
 import { useState } from "react";
 import CrudPage from "../components/CrudPage.jsx";
+import PageDashboard from "../components/PageDashboard.jsx";
 import Badge from "../components/Badge.jsx";
 import useOptions from "../hooks/useOptions.js";
+import ClinicBranchField from "../components/ClinicBranchField.jsx";
 import api, { apiError } from "../api/client.js";
 import { useToast } from "../context/ToastContext.jsx";
 import { DetailGrid, DetailItem } from "../components/Detail.jsx";
@@ -26,7 +28,7 @@ const STATUS = [
   { value: "converted", label: "Converted" },
 ];
 
-function EstimateForm({ values, setValues, patients, branches }) {
+function EstimateForm({ values, setValues, patients }) {
   const items = values.items || [];
   const subtotal = items.reduce((s, it) => s + (Number(it.qty) || 0) * (Number(it.price) || 0), 0);
   const gst = items.reduce((s, it) => s + ((Number(it.qty) || 0) * (Number(it.price) || 0) * (Number(it.gstRate) || 0)) / 100, 0);
@@ -53,13 +55,10 @@ function EstimateForm({ values, setValues, patients, branches }) {
             {patients.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         </div>
-        <div className="field">
-          <label>Branch</label>
-          <select value={values.branch || ""} onChange={(e) => setValues({ ...values, branch: e.target.value })}>
-            <option value="">Select…</option>
-            {branches.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-        </div>
+        <ClinicBranchField
+          value={values.branch || ""}
+          onChange={(branchId) => setValues({ ...values, branch: branchId })}
+        />
         <div className="field">
           <label>Date</label>
           <input type="date" value={values.date || ""} onChange={(e) => setValues({ ...values, date: e.target.value })} />
@@ -108,7 +107,6 @@ function EstimateForm({ values, setValues, patients, branches }) {
 
 export default function Estimates() {
   const patients = useOptions("patients", (p) => ({ value: p._id, label: p.name }));
-  const branches = useOptions("branches", (b) => ({ value: b._id, label: b.name }));
   const toast = useToast();
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -131,6 +129,16 @@ export default function Estimates() {
       singular="Estimate"
       statusOptions={STATUS}
       defaultValues={{ date: toDateInput(new Date()), status: "draft", items: [{ description: "", hsn: "", qty: 1, price: 0, gstRate: 0 }], discount: 0 }}
+      topContent={
+        <PageDashboard
+          resource="estimates"
+          cards={[
+            { key: "total", label: "Total Estimates", icon: "🧾" },
+            { key: "draft", label: "Draft", icon: "📝" },
+            { key: "accepted", label: "Accepted", icon: "✅" },
+          ]}
+        />
+      }
       columns={[
         { key: "estimateNo", header: "Estimate", render: (r) => <span className="cell-main">{r.estimateNo}</span> },
         { key: "patient", header: "Patient", render: (r) => r.patient?.name || "—" },
@@ -153,7 +161,7 @@ export default function Estimates() {
       fields={[]}
       wideForm
       renderForm={({ values, setValues }) => (
-        <EstimateForm values={values} setValues={setValues} patients={patients} branches={branches} />
+        <EstimateForm values={values} setValues={setValues} patients={patients} />
       )}
       toForm={(r) => ({
         patient: r.patient?._id || "",

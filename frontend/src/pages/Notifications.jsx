@@ -1,4 +1,5 @@
 import CrudPage from "../components/CrudPage.jsx";
+import PageDashboard from "../components/PageDashboard.jsx";
 import Badge from "../components/Badge.jsx";
 import { DetailGrid, DetailItem } from "../components/Detail.jsx";
 
@@ -8,6 +9,7 @@ const TYPE = [
   { value: "payment-reminder", label: "Payment Reminder" },
   { value: "stock-expiry", label: "Stock Expiry" },
   { value: "equipment-service", label: "Equipment Service" },
+  { value: "thank-you", label: "Thank You" },
 ];
 const CHANNEL = [
   { value: "sms", label: "SMS" },
@@ -33,6 +35,16 @@ export default function Notifications() {
       subtitle="Log of appointment, follow-up, payment and stock reminders."
       endpoint="notifications"
       singular="Notification"
+      topContent={
+        <PageDashboard
+          resource="notifications"
+          cards={[
+            { key: "total", label: "Total", icon: "🔔" },
+            { key: "sent", label: "Sent", icon: "✅" },
+            { key: "failed", label: "Failed", icon: "❌" },
+          ]}
+        />
+      }
       statusOptions={STATUS}
       defaultValues={{ type: "appointment-reminder", channel: "sms", status: "logged" }}
       columns={[

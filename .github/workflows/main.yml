@@ -1,4 +1,4 @@
-name: Evident Backend CI/CD
+name: Denta Cloud Backend CI/CD
 
 on:
   push:

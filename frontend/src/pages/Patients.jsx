@@ -1,8 +1,10 @@
+import { useEffect, useState } from "react";
 import CrudPage from "../components/CrudPage.jsx";
+import PageDashboard from "../components/PageDashboard.jsx";
 import Badge from "../components/Badge.jsx";
 import PatientForm from "../components/PatientForm.jsx";
 import QuickContact from "../components/QuickContact.jsx";
-import useOptions from "../hooks/useOptions.js";
+import api from "../api/client.js";
 import { DetailGrid, DetailItem } from "../components/Detail.jsx";
 
 const REASON_LABELS = {
@@ -47,13 +49,13 @@ const emptyDefaults = {
   medical: {},
   address: {},
   prescriptions: [],
+  relatedParty: [],
+  sourceOfReference: "",
   previousTreatment: false,
   gumBleeding: false,
 };
 
 export default function Patients() {
-  const branches = useOptions("branches", (b) => ({ value: b._id, label: b.name }));
-
   return (
     <CrudPage
       title="Patients"
@@ -61,6 +63,16 @@ export default function Patients() {
       endpoint="patients"
       singular="Patient"
       wideForm
+      topContent={
+        <PageDashboard
+          resource="patients"
+          cards={[
+            { key: "total", label: "Total Patients", icon: "👥" },
+            { key: "active", label: "Active", icon: "✅" },
+            { key: "inactive", label: "Inactive", icon: "⏸️" },
+          ]}
+        />
+      }
       statusOptions={[{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }]}
       defaultValues={emptyDefaults}
       columns={[
@@ -77,7 +89,7 @@ export default function Patients() {
             </div>
           ),
         },
-        { key: "phone", header: "Phone", render: (r) => <QuickContact phone={r.phone} /> },
+        { key: "phone", header: "Phone", render: (r) => <QuickContact phone={r.phone} patientId={r._id} patientName={r.name} /> },
         { key: "branch", header: "Branch", render: (r) => r.branch?.name || "—" },
         { key: "reasonForVisit", header: "Reason", render: (r) => REASON_LABELS[r.reasonForVisit] || "—" },
         { key: "status", header: "Status", render: (r) => <Badge value={r.status} /> },
@@ -88,7 +100,6 @@ export default function Patients() {
           values={values}
           setValues={setValues}
           editing={editing}
-          branches={branches}
         />
       )}
       toForm={(r) => ({
@@ -104,6 +115,10 @@ export default function Patients() {
         patientId: r.patientId || "",
         branch: r.branch?._id || "",
         referredBy: r.referredBy || "",
+        sourceOfReference: r.sourceOfReference || "",
+        referredByPatient: r.referredByPatient?._id || "",
+        relatedParty: r.relatedParty || [],
+        thankYouSentAt: r.thankYouSentAt || "",
         bloodGroup: r.bloodGroup || "",
         medical: r.medical || {},
         allergies: r.allergies || "",
@@ -135,9 +150,26 @@ export default function Patients() {
           lastVisitDate: withoutBilling.lastVisitDate || null,
           firstVisitDate: withoutBilling.firstVisitDate || null,
           branch: withoutBilling.branch || null,
+          sourceOfReference: withoutBilling.sourceOfReference || "",
+          referredByPatient: withoutBilling.referredByPatient || null,
+          relatedParty: withoutBilling.relatedParty || [],
         };
       }}
-      renderView={(r) => (
+      renderView={(r) => <PatientDetailView patient={r} />}
+    />
+  );
+}
+
+function PatientDetailView({ patient: r }) {
+  const [patientReports, setPatientReports] = useState([]);
+
+  useEffect(() => {
+    api.get("/reports", { params: { patient: r._id, limit: 20 } })
+      .then(({ data }) => setPatientReports(data.data || []))
+      .catch(() => setPatientReports([]));
+  }, [r._id]);
+
+  return (
         <div className="patient-view">
           <div className="pv-head">
             {r.photo ? <img className="pv-photo" src={r.photo} alt={r.name} /> : <div className="pv-photo ph">{initials(r.name)}</div>}
@@ -156,8 +188,21 @@ export default function Patients() {
             <DetailItem label="Blood Group" value={r.bloodGroup} />
             <DetailItem label="Branch" value={r.branch?.name} />
             <DetailItem label="Referred By" value={r.referredBy} />
+            <DetailItem label="Source" value={r.sourceOfReference || "—"} />
+            <DetailItem label="Thank-you Email" value={r.thankYouSentAt ? new Date(r.thankYouSentAt).toLocaleString("en-IN") : "Not sent"} />
             <DetailItem label="Address" value={fmtAddress(r.address)} full />
           </DetailGrid>
+
+          {(r.relatedParty || []).length > 0 && (
+            <>
+              <h4 className="pv-group">Related Party</h4>
+              <DetailGrid>
+                {(r.relatedParty || []).map((p, i) => (
+                  <DetailItem key={i} label={p.relation || "Related"} value={`${p.name || ""} ${p.phone || ""}`.trim()} />
+                ))}
+              </DetailGrid>
+            </>
+          )}
 
           <h4 className="pv-group">Medical</h4>
           <DetailGrid>
@@ -196,6 +241,22 @@ export default function Patients() {
             </>
           )}
 
+          {patientReports.length > 0 && (
+            <>
+              <h4 className="pv-group">Clinical Reports</h4>
+              <div className="pv-files">
+                {patientReports.map((rep) => (
+                  <div className="file-pill solo" key={rep._id}>
+                    <span>{rep.title || rep.type}</span>
+                    {(rep.files || []).map((f, i) => (
+                      <a key={i} href={f} target="_blank" rel="noreferrer">View</a>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
           {(r.comments || r.doctorInstructions || r.specialNotes) && (
             <>
               <h4 className="pv-group">Notes</h4>
@@ -207,7 +268,5 @@ export default function Patients() {
             </>
           )}
         </div>
-      )}
-    />
   );
 }

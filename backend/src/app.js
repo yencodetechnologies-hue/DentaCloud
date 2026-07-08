@@ -15,7 +15,7 @@ app.use(express.json({ limit: "2mb" }));
 
 app.use("/uploads", express.static(uploadsDir));
 
-app.get("/", (req, res) => res.json({ name: "Evident Dental API", status: "ok" }));
+app.get("/", (req, res) => res.json({ name: "Denta Cloud API", status: "ok" }));
 app.get("/api/health", (req, res) => res.json({ status: "ok", time: new Date().toISOString() }));
 
 app.use("/api", apiRoutes);

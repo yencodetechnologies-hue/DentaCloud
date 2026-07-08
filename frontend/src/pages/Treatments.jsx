@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import CrudPage from "../components/CrudPage.jsx";
+import PageDashboard from "../components/PageDashboard.jsx";
 import Badge from "../components/Badge.jsx";
 import api from "../api/client.js";
 import useOptions from "../hooks/useOptions.js";
@@ -93,7 +94,6 @@ function TreatmentSummary({ version }) {
 export default function Treatments() {
   const patients = useOptions("patients", (p) => ({ value: p._id, label: p.name }));
   const doctors = useOptions("doctors", (d) => ({ value: d._id, label: d.name }));
-  const branches = useOptions("branches", (b) => ({ value: b._id, label: b.name }));
 
   return (
     <CrudPage
@@ -103,7 +103,19 @@ export default function Treatments() {
       singular="Treatment"
       statusOptions={STATUS}
       defaultValues={{ status: "planned", category: "General", cost: 0, sessions: 1 }}
-      topContent={<TreatmentSummary />}
+      topContent={
+        <>
+          <PageDashboard
+            resource="treatments"
+            cards={[
+              { key: "ongoing", label: "Ongoing", icon: "🦷" },
+              { key: "completed", label: "Completed", icon: "✅" },
+              { key: "total", label: "Total", icon: "📊" },
+            ]}
+          />
+          <TreatmentSummary />
+        </>
+      }
       columns={[
         {
           key: "name",
@@ -129,7 +141,7 @@ export default function Treatments() {
         { name: "category", label: "Category", type: "select", options: CATEGORIES },
         { name: "patient", label: "Patient", type: "select", options: patients, required: true },
         { name: "doctor", label: "Doctor", type: "select", options: doctors },
-        { name: "branch", label: "Branch", type: "select", options: branches },
+        { name: "branch", label: "Branch", type: "clinicBranch" },
         { name: "toothNumber", label: "Tooth Number", placeholder: "e.g. 36 or Full" },
         { name: "cost", label: "Cost (₹)", type: "number", min: 0 },
         { name: "sessions", label: "Sessions", type: "number", min: 1 },

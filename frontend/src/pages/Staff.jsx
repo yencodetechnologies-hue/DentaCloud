@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import CrudPage from "../components/CrudPage.jsx";
+import PageDashboard from "../components/PageDashboard.jsx";
 import Badge from "../components/Badge.jsx";
-import useOptions from "../hooks/useOptions.js";
+import ClinicBranchField from "../components/ClinicBranchField.jsx";
 import { DetailGrid, DetailItem } from "../components/Detail.jsx";
 import api, { apiError } from "../api/client.js";
 import { useToast } from "../context/ToastContext.jsx";
@@ -15,6 +16,7 @@ const GENDER_OPTIONS = [
   { value: "other", label: "Other" },
 ];
 const ACCOUNT_TYPES = ["Savings", "Current", "Salary", "NRI"];
+const WEEKDAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 const STATUS_OPTIONS = [
   { value: "active", label: "Active" },
   { value: "inactive", label: "Inactive" },
@@ -43,8 +45,6 @@ function buildStaffName(values) {
 }
 
 export default function Staff() {
-  const branches = useOptions("branches", (b) => ({ value: b._id, label: b.name }));
-
   return (
     <CrudPage
       title="Staff"
@@ -53,6 +53,16 @@ export default function Staff() {
       singular="Staff"
       wideForm
       statusOptions={STATUS_OPTIONS}
+      topContent={
+        <PageDashboard
+          resource="staff"
+          cards={[
+            { key: "total", label: "Total Staff", icon: "🧑‍💼" },
+            { key: "active", label: "Active", icon: "✅" },
+            { key: "inactive", label: "Inactive", icon: "⏸️" },
+          ]}
+        />
+      }
       defaultValues={{
         titlePrefix: "Dr.",
         lastNamePrefix: "D/o",
@@ -85,7 +95,7 @@ export default function Staff() {
         { key: "status", header: "Status", render: (r) => <Badge value={r.status} /> },
       ]}
       fields={() => []}
-      renderForm={({ values, setValues }) => <StaffForm values={values} setValues={setValues} branches={branches} />}
+      renderForm={({ values, setValues }) => <StaffForm values={values} setValues={setValues} />}
       toForm={(r) => ({
         titlePrefix: r.titlePrefix || "Dr.",
         firstName: r.firstName || r.name || "",
@@ -110,6 +120,16 @@ export default function Staff() {
         bankName: r.bankName || "",
         bankBranchName: r.bankBranchName || "",
         ifscCode: r.ifscCode || "",
+        employeeId: r.employeeId || "",
+        designation: r.designation || "",
+        role: r.role || "Receptionist",
+        joiningDate: dateInputValue(r.joiningDate),
+        weeklyOff: r.weeklyOff || [],
+        jobResponsibilities: r.jobResponsibilities || "",
+        documents: r.documents || [],
+        offerLetter: r.offerLetter || "",
+        shift: r.shift || "morning",
+        salary: r.salary ?? 0,
         branch: r.branch?._id || "",
         status: r.status || "active",
       })}
@@ -138,6 +158,16 @@ export default function Staff() {
         bankName: v.bankName || "",
         bankBranchName: v.bankBranchName || "",
         ifscCode: v.ifscCode || "",
+        employeeId: v.employeeId || "",
+        designation: v.designation || "",
+        role: v.role || "Receptionist",
+        joiningDate: v.joiningDate || null,
+        weeklyOff: v.weeklyOff || [],
+        jobResponsibilities: v.jobResponsibilities || "",
+        documents: v.documents || [],
+        offerLetter: v.offerLetter || "",
+        shift: v.shift || "morning",
+        salary: Number(v.salary) || 0,
         branch: v.branch || null,
         status: v.status || "active",
       })}
@@ -161,16 +191,30 @@ export default function Staff() {
           <DetailItem label="Bank Name" value={r.bankName} />
           <DetailItem label="Branch Name" value={r.bankBranchName} />
           <DetailItem label="IFSC Code" value={r.ifscCode} />
+          <DetailItem label="Employee ID" value={r.employeeId} />
+          <DetailItem label="Designation" value={r.designation || r.role} />
+          <DetailItem label="Joining Date" value={r.joiningDate ? new Date(r.joiningDate).toLocaleDateString("en-IN") : "-"} />
+          <DetailItem label="Weekly Off" value={(r.weeklyOff || []).join(", ") || "-"} />
+          <DetailItem label="Job Responsibilities" value={r.jobResponsibilities} full />
+          <DetailItem label="Salary" value={r.salary ? `₹${r.salary}` : "-"} />
+          <DetailItem label="Shift" value={r.shift} />
           <DetailItem label="Clinic Branch" value={r.branch?.name} />
           <DetailItem label="Status" value={<Badge value={r.status} />} />
-          {r.image && <DetailItem label="Image" value={<a href={r.image} target="_blank" rel="noreferrer">View image</a>} />}
+          {r.offerLetter && <DetailItem label="Offer Letter" value={<a href={r.offerLetter} target="_blank" rel="noreferrer">View</a>} />}
+          {(r.documents || []).length > 0 && (
+            <DetailItem
+              label="Documents"
+              value={(r.documents || []).map((d, i) => <a key={i} href={d.url} target="_blank" rel="noreferrer" style={{ display: "block" }}>{d.name || `Doc ${i + 1}`}</a>)}
+              full
+            />
+          )}
         </DetailGrid>
       )}
     />
   );
 }
 
-function StaffForm({ values, setValues, branches }) {
+function StaffForm({ values, setValues }) {
   const toast = useToast();
   const [uploading, setUploading] = useState(false);
   const computedAge = useMemo(() => ageFromDob(values.dob), [values.dob]);
@@ -286,6 +330,55 @@ function StaffForm({ values, setValues, branches }) {
         )}
       </div>
 
+      <h4 className="staff-form-section">HR Details</h4>
+      <div className="form-grid">
+        <Field label="Employee ID">
+          <input value={values.employeeId || ""} readOnly placeholder="Auto-generated" />
+        </Field>
+        <Field label="Designation">
+          <input value={values.designation || ""} onChange={(e) => set("designation", e.target.value)} placeholder="e.g. Receptionist" />
+        </Field>
+        <Field label="Joining Date">
+          <input type="date" value={values.joiningDate || ""} onChange={(e) => set("joiningDate", e.target.value)} />
+        </Field>
+        <Field label="Shift">
+          <select value={values.shift || "morning"} onChange={(e) => set("shift", e.target.value)}>
+            <option value="morning">Morning</option>
+            <option value="evening">Evening</option>
+            <option value="night">Night</option>
+            <option value="full-day">Full Day</option>
+          </select>
+        </Field>
+        <Field label="Salary (₹)">
+          <input type="number" min={0} value={values.salary ?? 0} onChange={(e) => set("salary", Number(e.target.value))} />
+        </Field>
+        <Field label="Weekly Off">
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {WEEKDAYS.map((d) => (
+              <label key={d} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <input
+                  type="checkbox"
+                  checked={(values.weeklyOff || []).includes(d)}
+                  onChange={(e) => {
+                    const off = new Set(values.weeklyOff || []);
+                    if (e.target.checked) off.add(d);
+                    else off.delete(d);
+                    set("weeklyOff", [...off]);
+                  }}
+                />
+                {d.toUpperCase()}
+              </label>
+            ))}
+          </div>
+        </Field>
+        <Field label="Job Responsibilities" full>
+          <textarea rows={3} value={values.jobResponsibilities || ""} onChange={(e) => set("jobResponsibilities", e.target.value)} />
+        </Field>
+        <Field label="Offer Letter URL">
+          <input value={values.offerLetter || ""} onChange={(e) => set("offerLetter", e.target.value)} placeholder="Upload via Browse below or paste URL" />
+        </Field>
+      </div>
+
       <h4 className="staff-form-section">Bank Details</h4>
       <div className="form-grid">
         <Field label="Account Holder Name" req>
@@ -309,12 +402,11 @@ function StaffForm({ values, setValues, branches }) {
         <Field label="IFSC Code" req>
           <input value={values.ifscCode || ""} onChange={(e) => set("ifscCode", e.target.value.toUpperCase())} placeholder="Enter IFSC Code" required />
         </Field>
-        <Field label="Clinic Branch">
-          <select value={values.branch || ""} onChange={(e) => set("branch", e.target.value)}>
-            <option value="">Select Branch</option>
-            {branches.map((b) => <option key={b.value} value={b.value}>{b.label}</option>)}
-          </select>
-        </Field>
+        <ClinicBranchField
+          label="Clinic Branch"
+          value={values.branch || ""}
+          onChange={(branchId) => set("branch", branchId)}
+        />
         <Field label="Status">
           <select value={values.status || "active"} onChange={(e) => set("status", e.target.value)}>
             {STATUS_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
