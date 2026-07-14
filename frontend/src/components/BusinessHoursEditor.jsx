@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 const WEEKDAYS = [
   { key: "mon", label: "Monday" },
@@ -80,14 +80,19 @@ function availabilityToWeeklySchedule(availability) {
       from: toTimeValueMaybe(slot.from),
       to: toTimeValueMaybe(slot.to),
     });
+    weekly[day].breaks = [];
   });
 
-  // Remove placeholder slots when real slots exist
   Object.keys(weekly).forEach((day) => {
     weekly[day].slots = normalizeRanges(weekly[day].slots, { keepOnePlaceholder: true });
+    weekly[day].breaks = [];
   });
 
   return weekly;
+}
+
+function normalizeDayStatus(status) {
+  return status === "available" ? "available" : "weeklyOff";
 }
 
 function weeklyScheduleArrayToWeeklyState(weeklyScheduleArray) {
@@ -96,19 +101,19 @@ function weeklyScheduleArrayToWeeklyState(weeklyScheduleArray) {
     const day = dayItem?.day;
     if (!weekly[day]) return;
 
-    const status = ["available", "weeklyOff", "holiday"].includes(dayItem?.status) ? dayItem.status : "weeklyOff";
+    const status = normalizeDayStatus(dayItem?.status);
     weekly[day] = {
       status,
       slots: normalizeRanges(dayItem?.slots, { keepOnePlaceholder: true }),
-      breaks: normalizeRanges(dayItem?.breaks, { keepOnePlaceholder: false }),
+      breaks: [],
     };
   });
 
-  // ensure available days keep one slot placeholder
   Object.keys(weekly).forEach((day) => {
     if (weekly[day].status === "available") {
       weekly[day].slots = normalizeRanges(weekly[day].slots, { keepOnePlaceholder: true });
     }
+    weekly[day].breaks = [];
   });
 
   return weekly;
@@ -117,10 +122,18 @@ function weeklyScheduleArrayToWeeklyState(weeklyScheduleArray) {
 function weeklyStateToWeeklyScheduleArray(weekly) {
   return WEEKDAYS.map((d) => {
     const dayState = weekly?.[d.key] || { status: "weeklyOff", slots: [], breaks: [] };
-    const status = ["available", "weeklyOff", "holiday"].includes(dayState.status) ? dayState.status : "weeklyOff";
-    const slots = normalizeRanges(dayState.slots, { keepOnePlaceholder: false }).filter((r) => r.from && r.to);
-    const breaks = normalizeRanges(dayState.breaks, { keepOnePlaceholder: false }).filter((r) => r.from && r.to);
-    return { day: d.key, status, slots, breaks };
+    const status = normalizeDayStatus(dayState.status);
+    // Keep incomplete start/end while editing so values don't get wiped on re-render
+    let slots = (dayState.slots || []).map((r) => ({
+      from: toTimeValueMaybe(r?.from) || String(r?.from || "").trim(),
+      to: toTimeValueMaybe(r?.to) || String(r?.to || "").trim(),
+    })).filter((r) => r.from || r.to);
+
+    if (status === "available" && !slots.length) {
+      slots = [{ from: "", to: "" }];
+    }
+
+    return { day: d.key, status, slots, breaks: [] };
   });
 }
 
@@ -176,197 +189,184 @@ function validateRanges(label, ranges) {
   return errors;
 }
 
-function validateBreaksWithinSlots(breaks, slots) {
-  const b = (breaks || []).filter((r) => r.from && r.to);
-  const s = (slots || []).filter((r) => r.from && r.to);
-  const errors = [];
-  if (!b.length) return errors;
-  if (!s.length) return ["Breaks require at least one working slot"];
-
-  b.forEach((br, idx) => {
-    const brStart = timeToMinutes(br.from);
-    const brEnd = timeToMinutes(br.to);
-    if (brStart == null || brEnd == null) return;
-    const ok = s.some((sl) => {
-      const slStart = timeToMinutes(sl.from);
-      const slEnd = timeToMinutes(sl.to);
-      if (slStart == null || slEnd == null) return false;
-      return slStart <= brStart && brEnd <= slEnd;
-    });
-    if (!ok) errors.push(`Break #${idx + 1} must be inside a working slot`);
-  });
-
-  return errors;
-}
-
 export default function BusinessHoursEditor({ value = [], onChange }) {
   const initial = useMemo(() => {
     if (isWeeklyScheduleValue(value)) return weeklyScheduleArrayToWeeklyState(value);
     return availabilityToWeeklySchedule(value);
-  }, [value]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- seed once from opening form values
   const [weekly, setWeekly] = useState(initial);
+  const lastEmittedRef = useRef("");
 
   useEffect(() => {
-    if (isWeeklyScheduleValue(value)) setWeekly(weeklyScheduleArrayToWeeklyState(value));
-    else setWeekly(availabilityToWeeklySchedule(value));
+    const nextState = isWeeklyScheduleValue(value)
+      ? weeklyScheduleArrayToWeeklyState(value)
+      : availabilityToWeeklySchedule(value);
+    const nextSerialized = JSON.stringify(weeklyStateToWeeklyScheduleArray(nextState));
+
+    // Ignore echoes of our own onChange so mid-edit times are not reset
+    if (nextSerialized === lastEmittedRef.current) return;
+
+    lastEmittedRef.current = nextSerialized;
+    setWeekly(nextState);
   }, [value]);
 
   function update(nextWeekly) {
     setWeekly(nextWeekly);
+    const weeklySchedule = weeklyStateToWeeklyScheduleArray(nextWeekly);
+    lastEmittedRef.current = JSON.stringify(weeklySchedule);
     onChange?.({
-      weeklySchedule: weeklyStateToWeeklyScheduleArray(nextWeekly),
+      weeklySchedule,
       availability: weeklyStateToLegacyAvailability(nextWeekly),
     });
   }
 
   function setStatus(day, status) {
+    const nextStatus = normalizeDayStatus(status);
     const prev = weekly[day] || { status: "weeklyOff", slots: [{ from: "", to: "" }], breaks: [] };
     const nextDay =
-      status === "available"
-        ? { ...prev, status, slots: normalizeRanges(prev.slots, { keepOnePlaceholder: true }) }
-        : { ...prev, status };
+      nextStatus === "available"
+        ? { ...prev, status: nextStatus, slots: normalizeRanges(prev.slots, { keepOnePlaceholder: true }), breaks: [] }
+        : { ...prev, status: nextStatus, breaks: [] };
     update({ ...weekly, [day]: nextDay });
   }
 
-  function setSlot(day, idx, patch, which = "slots") {
-    const dayState = weekly[day];
-    const list = [...(dayState[which] || [])];
-    list[idx] = { ...list[idx], ...patch };
-    update({ ...weekly, [day]: { ...dayState, [which]: list } });
+  function setSlot(day, idx, patch) {
+    const dayState = weekly[day] || { status: "available", slots: [{ from: "", to: "" }], breaks: [] };
+    const list = [...(dayState.slots || [])];
+    list[idx] = { ...(list[idx] || { from: "", to: "" }), ...patch };
+    update({ ...weekly, [day]: { ...dayState, slots: list, breaks: [] } });
   }
 
-  function addRange(day, which = "slots") {
-    const dayState = weekly[day];
-    const list = [...(dayState[which] || []), { from: "", to: "" }];
-    update({ ...weekly, [day]: { ...dayState, [which]: list } });
+  function addSlot(day) {
+    const dayState = weekly[day] || { status: "available", slots: [], breaks: [] };
+    const list = [...(dayState.slots || []), { from: "", to: "" }];
+    update({ ...weekly, [day]: { ...dayState, slots: list, breaks: [] } });
   }
 
-  function removeRange(day, idx, which = "slots") {
-    const dayState = weekly[day];
-    const list = (dayState[which] || []).filter((_, i) => i !== idx);
-    const nextList =
-      which === "slots" ? (list.length ? list : [{ from: "", to: "" }]) : list;
-    update({ ...weekly, [day]: { ...dayState, [which]: nextList } });
+  function removeSlot(day, idx) {
+    const dayState = weekly[day] || { status: "available", slots: [], breaks: [] };
+    const list = (dayState.slots || []).filter((_, i) => i !== idx);
+    update({
+      ...weekly,
+      [day]: {
+        ...dayState,
+        slots: list.length ? list : [{ from: "", to: "" }],
+        breaks: [],
+      },
+    });
   }
 
   function copyMondayToWeekdays() {
     const mon = weekly.mon;
+    const slots = (mon?.slots || []).map((s) => ({ from: s.from || "", to: s.to || "" }));
+    const copied = {
+      status: normalizeDayStatus(mon?.status),
+      slots: slots.length ? slots : [{ from: "", to: "" }],
+      breaks: [],
+    };
     update({
       ...weekly,
-      tue: { status: mon.status, slots: (mon.slots || []).map((s) => ({ from: s.from, to: s.to })), breaks: (mon.breaks || []).map((b) => ({ from: b.from, to: b.to })) },
-      wed: { status: mon.status, slots: (mon.slots || []).map((s) => ({ from: s.from, to: s.to })), breaks: (mon.breaks || []).map((b) => ({ from: b.from, to: b.to })) },
-      thu: { status: mon.status, slots: (mon.slots || []).map((s) => ({ from: s.from, to: s.to })), breaks: (mon.breaks || []).map((b) => ({ from: b.from, to: b.to })) },
-      fri: { status: mon.status, slots: (mon.slots || []).map((s) => ({ from: s.from, to: s.to })), breaks: (mon.breaks || []).map((b) => ({ from: b.from, to: b.to })) },
+      tue: { ...copied, slots: copied.slots.map((s) => ({ ...s })) },
+      wed: { ...copied, slots: copied.slots.map((s) => ({ ...s })) },
+      thu: { ...copied, slots: copied.slots.map((s) => ({ ...s })) },
+      fri: { ...copied, slots: copied.slots.map((s) => ({ ...s })) },
     });
   }
 
   return (
     <div className="business-hours">
       <div className="business-hours-header">
-        <div className="business-hours-title">Weekly Hours</div>
+        <div>
+          <div className="business-hours-title">Weekly Hours</div>
+          <div className="business-hours-subtitle">Set availability and working hours for each day</div>
+        </div>
         <button type="button" className="btn btn-ghost btn-sm" onClick={copyMondayToWeekdays}>
           Copy Monday to Weekdays
         </button>
       </div>
 
-      {WEEKDAYS.map((d) => {
-        const dayState = weekly[d.key];
-        const status = dayState?.status || "weeklyOff";
-        const isAvailable = status === "available";
-        const slotErrors = isAvailable ? validateRanges("Working hours", dayState?.slots || []) : [];
-        const breakErrors = isAvailable ? validateRanges("Break", dayState?.breaks || []) : [];
-        const breakWithinErrors = isAvailable ? validateBreaksWithinSlots(dayState?.breaks || [], dayState?.slots || []) : [];
-        const dayErrors = [...slotErrors, ...breakErrors, ...breakWithinErrors];
-        return (
-          <div key={d.key} className={`business-hours-row ${status !== "available" ? "is-closed" : ""}`}>
-            <div className="business-hours-day">
-              <div className="bh-day-label">{d.label}</div>
-              <div className={`bh-status-chip status-${status}`}>
-                {status === "available" ? "Available" : status === "holiday" ? "Holiday" : "Weekly off"}
-              </div>
-            </div>
+      <div className="business-hours-list">
+        {WEEKDAYS.map((d) => {
+          const dayState = weekly[d.key];
+          const status = normalizeDayStatus(dayState?.status || "weeklyOff");
+          const isAvailable = status === "available";
+          const slots = dayState?.slots?.length ? dayState.slots : [{ from: "", to: "" }];
+          const dayErrors = isAvailable ? validateRanges("Working hours", slots) : [];
+          return (
+            <div key={d.key} className={`business-hours-row ${status !== "available" ? "is-closed" : "is-open"}`}>
+              <div className="bh-row-top">
+                <div className="business-hours-day">
+                  <div className="bh-day-label">{d.label}</div>
+                  <div className={`bh-status-chip status-${status}`}>
+                    {status === "available" ? "Available" : "Weekly off"}
+                  </div>
+                </div>
 
-            <div className="bh-status">
-              <div className="bh-segmented">
-                <button type="button" className={`bh-seg ${status === "available" ? "active" : ""}`} onClick={() => setStatus(d.key, "available")}>
-                  Available
-                </button>
-                <button type="button" className={`bh-seg ${status === "weeklyOff" ? "active" : ""}`} onClick={() => setStatus(d.key, "weeklyOff")}>
-                  Weekly off
-                </button>
-                <button type="button" className={`bh-seg ${status === "holiday" ? "active" : ""}`} onClick={() => setStatus(d.key, "holiday")}>
-                  Holiday
-                </button>
+                <div className="bh-status">
+                  <div className="bh-segmented" role="group" aria-label={`${d.label} status`}>
+                    <button type="button" className={`bh-seg ${status === "available" ? "active" : ""}`} onClick={() => setStatus(d.key, "available")}>
+                      Available
+                    </button>
+                    <button type="button" className={`bh-seg ${status === "weeklyOff" ? "active" : ""}`} onClick={() => setStatus(d.key, "weeklyOff")}>
+                      Weekly off
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
 
-            <div className="business-hours-slots">
-              {!isAvailable ? (
-                <div className="muted">{status === "holiday" ? "Holiday (no appointments)" : "No working hours"}</div>
-              ) : (
-                <div className="bh-available">
-                  <div className="bh-section">
-                    <div className="bh-section-title">Working hours</div>
-                    {(dayState?.slots || []).map((s, idx) => (
-                      <div key={idx} className="business-hours-slot">
-                        <input type="time" value={s.from || ""} onChange={(e) => setSlot(d.key, idx, { from: e.target.value }, "slots")} />
+              <div className="business-hours-slots">
+                {!isAvailable ? (
+                  <div className="bh-closed-note">No working hours</div>
+                ) : (
+                  <div className="bh-available">
+                    {slots.map((slot, idx) => (
+                      <div key={idx} className="bh-hours-row">
+                        <label className="bh-hours-label">Start</label>
+                        <input
+                          type="time"
+                          value={slot.from || ""}
+                          onChange={(e) => setSlot(d.key, idx, { from: e.target.value })}
+                        />
                         <span className="business-hours-sep">to</span>
-                        <input type="time" value={s.to || ""} onChange={(e) => setSlot(d.key, idx, { to: e.target.value }, "slots")} />
+                        <label className="bh-hours-label">End</label>
+                        <input
+                          type="time"
+                          value={slot.to || ""}
+                          onChange={(e) => setSlot(d.key, idx, { to: e.target.value })}
+                        />
                         <button
                           type="button"
                           className="btn btn-ghost btn-sm"
-                          onClick={() => removeRange(d.key, idx, "slots")}
-                          disabled={(dayState?.slots || []).length <= 1}
+                          onClick={() => removeSlot(d.key, idx)}
+                          disabled={slots.length <= 1}
                         >
                           Remove
                         </button>
                       </div>
                     ))}
+
                     <div className="bh-actions">
-                      <button type="button" className="btn btn-sm" onClick={() => addRange(d.key, "slots")}>
+                      <button type="button" className="btn btn-sm" onClick={() => addSlot(d.key)}>
                         + Add hours
                       </button>
                     </div>
-                  </div>
 
-                  <div className="bh-section">
-                    <div className="bh-section-title">Breaks</div>
-                    {(dayState?.breaks || []).length ? (
-                      (dayState?.breaks || []).map((b, idx) => (
-                        <div key={idx} className="business-hours-slot bh-break">
-                          <input type="time" value={b.from || ""} onChange={(e) => setSlot(d.key, idx, { from: e.target.value }, "breaks")} />
-                          <span className="business-hours-sep">to</span>
-                          <input type="time" value={b.to || ""} onChange={(e) => setSlot(d.key, idx, { to: e.target.value }, "breaks")} />
-                          <button type="button" className="btn btn-ghost btn-sm" onClick={() => removeRange(d.key, idx, "breaks")}>
-                            Remove
-                          </button>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="muted">No breaks</div>
-                    )}
-                    <div className="bh-actions">
-                      <button type="button" className="btn btn-sm btn-ghost" onClick={() => addRange(d.key, "breaks")}>
-                        + Add break
-                      </button>
-                    </div>
+                    {dayErrors.length ? (
+                      <div className="bh-errors">
+                        {dayErrors.map((e, i) => (
+                          <div key={i} className="bh-error">
+                            {e}
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
-
-                  {dayErrors.length ? (
-                    <div className="bh-errors">
-                      {dayErrors.map((e, i) => (
-                        <div key={i} className="bh-error">
-                          {e}
-                        </div>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-              )}
+                )}
+              </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }

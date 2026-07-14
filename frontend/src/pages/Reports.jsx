@@ -1,3 +1,5 @@
+import { useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import CrudPage from "../components/CrudPage.jsx";
 import PageDashboard from "../components/PageDashboard.jsx";
 import Badge from "../components/Badge.jsx";
@@ -7,11 +9,11 @@ import ClinicBranchField from "../components/ClinicBranchField.jsx";
 import { DetailGrid, DetailItem } from "../components/Detail.jsx";
 
 const REPORT_TYPES = [
-  { value: "treatment-report", label: "Treatment Report" },
+  { value: "treatment-report", label: "Treatment Reports" },
   { value: "dos-donts", label: "Do's & Don'ts" },
-  { value: "xray", label: "X-Ray" },
+  { value: "xray", label: "X-Rays" },
   { value: "prescription", label: "Prescription" },
-  { value: "lab-report", label: "Lab Report" },
+  { value: "lab-report", label: "Lab Reports" },
   { value: "photo", label: "Photo" },
 ];
 
@@ -23,30 +25,51 @@ function toDateInput(d) {
 }
 
 export default function Reports() {
+  const [searchParams] = useSearchParams();
+  const typeFilter = searchParams.get("type") || "";
+  const typeMeta = REPORT_TYPES.find((t) => t.value === typeFilter);
+  const listParams = useMemo(
+    () => (typeFilter ? { type: typeFilter } : {}),
+    [typeFilter]
+  );
   const patients = useOptions("patients", (p) => ({ value: p._id, label: `${p.name} (${p.patientId})` }));
   const doctors = useOptions("doctors", (d) => ({ value: d._id, label: d.name }));
+  const title = typeMeta?.label || "Reports";
+  const formTypes = typeFilter
+    ? REPORT_TYPES.filter((t) => t.value === typeFilter)
+    : REPORT_TYPES;
 
   return (
     <CrudPage
-      title="Reports"
-      subtitle="Clinical reports, X-rays, prescriptions, lab reports and photos."
+      key={typeFilter || "all"}
+      title={title}
+      subtitle={
+        typeMeta
+          ? `Manage ${typeMeta.label.toLowerCase()} for patients.`
+          : "Clinical reports, X-rays, prescriptions, lab reports and photos."
+      }
       endpoint="reports"
-      singular="Report"
+      singular={typeMeta ? typeMeta.label.replace(/s$/, "") : "Report"}
       wideForm
-      defaultValues={{ type: "treatment-report", date: toDateInput(new Date()), files: [] }}
+      listParams={listParams}
+      defaultValues={{ type: typeFilter || "treatment-report", date: toDateInput(new Date()), files: [] }}
       topContent={
-        <PageDashboard
-          resource="reports"
-          cards={[
-            { key: "total", label: "Total Reports", icon: "📋" },
-            { key: "treatment", label: "Treatment Reports", icon: "🦷" },
-            { key: "xray", label: "X-Rays", icon: "🩻" },
-          ]}
-        />
+        !typeFilter ? (
+          <PageDashboard
+            resource="reports"
+            cards={[
+              { key: "total", label: "Total Reports", icon: "📋" },
+              { key: "treatment", label: "Treatment Reports", icon: "🦷" },
+              { key: "xray", label: "X-Rays", icon: "🩻" },
+            ]}
+          />
+        ) : null
       }
       columns={[
         { key: "title", header: "Title", render: (r) => r.title || REPORT_TYPES.find((t) => t.value === r.type)?.label },
-        { key: "type", header: "Type", render: (r) => <Badge value={r.type} /> },
+        ...(!typeFilter
+          ? [{ key: "type", header: "Type", render: (r) => <Badge value={r.type} /> }]
+          : []),
         { key: "patient", header: "Patient", render: (r) => r.patient?.name || "—" },
         { key: "doctor", header: "Doctor", render: (r) => r.doctor?.name || "—" },
         { key: "date", header: "Date", render: (r) => fmtDate(r.date) },
@@ -56,8 +79,13 @@ export default function Reports() {
         <div className="form-grid">
           <div className="field">
             <label>Type <span className="req">*</span></label>
-            <select value={values.type} onChange={(e) => setValues({ ...values, type: e.target.value })} required>
-              {REPORT_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+            <select
+              value={values.type}
+              onChange={(e) => setValues({ ...values, type: e.target.value })}
+              required
+              disabled={!!typeFilter}
+            >
+              {formTypes.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
             </select>
           </div>
           <div className="field">
@@ -111,6 +139,7 @@ export default function Reports() {
       })}
       toPayload={(v) => ({
         ...v,
+        type: typeFilter || v.type,
         doctor: v.doctor || null,
         branch: v.branch || null,
         date: v.date || new Date(),

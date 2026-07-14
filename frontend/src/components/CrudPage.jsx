@@ -34,6 +34,10 @@ export default function CrudPage(props) {
     toPayload = (v) => v,
     renderView,
     onChanged,
+    listParams = {},
+    initialStatus = "",
+    hideStatusFilter = false,
+    tableProps = {},
   } = props;
 
   const toast = useToast();
@@ -44,7 +48,7 @@ export default function CrudPage(props) {
   const [pages, setPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState(initialStatus);
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -55,12 +59,20 @@ export default function CrudPage(props) {
   const [viewing, setViewing] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const listParamsKey = JSON.stringify(listParams || {});
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
+      const paramsExtra = listParamsKey ? JSON.parse(listParamsKey) : {};
       const { data } = await api.get(`/${endpoint}`, {
-        params: { page, search: search || undefined, status: statusFilter || undefined, limit: 10 },
+        params: {
+          page,
+          search: search || undefined,
+          status: statusFilter || undefined,
+          limit: 10,
+          ...paramsExtra,
+        },
       });
       setRows(data.data);
       setPages(data.pages);
@@ -70,7 +82,16 @@ export default function CrudPage(props) {
     } finally {
       setLoading(false);
     }
-  }, [endpoint, page, search, statusFilter, toast]);
+  }, [endpoint, page, search, statusFilter, toast, listParamsKey]);
+
+  useEffect(() => {
+    setStatusFilter(initialStatus || "");
+    setPage(1);
+  }, [initialStatus]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [listParamsKey]);
 
   useEffect(() => {
     const t = setTimeout(load, search ? 300 : 0);
@@ -78,6 +99,7 @@ export default function CrudPage(props) {
   }, [load]);
 
   const fieldSchema = typeof fields === "function" ? fields() : fields;
+  const resolvedColumns = typeof columns === "function" ? columns({ reload: load, rows, setRows, page }) : columns;
 
   function openCreate() {
     setEditing(null);
@@ -155,7 +177,7 @@ export default function CrudPage(props) {
                 onChange={(e) => { setPage(1); setSearch(e.target.value); }}
               />
             </div>
-            {statusOptions.length > 0 && (
+            {statusOptions.length > 0 && !hideStatusFilter && (
               <select className="select" value={statusFilter} onChange={(e) => { setPage(1); setStatusFilter(e.target.value); }}>
                 <option value="">All status</option>
                 {statusOptions.map((s) => (
@@ -167,7 +189,7 @@ export default function CrudPage(props) {
         </div>
 
         <DataTable
-          columns={columns}
+          columns={resolvedColumns}
           rows={rows}
           loading={loading}
           page={page}
@@ -178,6 +200,7 @@ export default function CrudPage(props) {
           onEdit={openEdit}
           onDelete={(row) => setDeleting(row)}
           emptyLabel={`No ${title.toLowerCase()} found`}
+          {...tableProps}
         />
       </div>
 

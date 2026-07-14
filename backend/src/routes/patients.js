@@ -5,7 +5,7 @@ import { sendThankYouEmail } from "../services/notify.js";
 
 const router = Router();
 const c = crudController(Patient, {
-  searchFields: ["name", "phone", "email", "patientId"],
+  searchFields: ["name", "firstName", "lastName", "phone", "email", "patientId"],
   populate: ["branch", "referredByPatient"],
 });
 

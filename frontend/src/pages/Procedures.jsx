@@ -1,21 +1,38 @@
+import { useState } from "react";
 import CrudPage from "../components/CrudPage.jsx";
 import PageDashboard from "../components/PageDashboard.jsx";
 import Badge from "../components/Badge.jsx";
-import useOptions from "../hooks/useOptions.js";
+import FormFields from "../components/FormFields.jsx";
 import { DetailGrid, DetailItem } from "../components/Detail.jsx";
-
-const CATEGORIES = [
-  "General", "Orthodontics", "Endodontics", "Periodontics", "Prosthodontics", "Surgery", "Cosmetic", "Diagnostic",
-].map((c) => ({ value: c, label: c }));
+import api, { apiError } from "../api/client.js";
+import { useToast } from "../context/ToastContext.jsx";
 
 const STATUS = [{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }];
+const PAGE_SIZE = 10;
 
 function money(n) {
   return `₹${(Number(n) || 0).toLocaleString("en-IN")}`;
 }
 
 export default function Procedures() {
-  const enterprises = useOptions("enterprises", (e) => ({ value: e._id, label: e.name }));
+  const toast = useToast();
+  const [dashKey, setDashKey] = useState(0);
+  const [statusBusyId, setStatusBusyId] = useState(null);
+
+  async function toggleProcedureStatus(row, setRows) {
+    const nextStatus = row.status === "active" ? "inactive" : "active";
+    setStatusBusyId(row._id);
+    try {
+      await api.put(`/procedures/${row._id}`, { status: nextStatus });
+      setRows?.((prev) => prev.map((r) => (r._id === row._id ? { ...r, status: nextStatus } : r)));
+      toast.success(`Procedure marked ${nextStatus}`);
+      setDashKey((k) => k + 1);
+    } catch (err) {
+      toast.error(apiError(err));
+    } finally {
+      setStatusBusyId(null);
+    }
+  }
 
   return (
     <CrudPage
@@ -24,10 +41,18 @@ export default function Procedures() {
       endpoint="procedures"
       singular="Procedure"
       statusOptions={STATUS}
-      defaultValues={{ category: "General", charge: 0, defaultSessions: 1, status: "active" }}
+      defaultValues={{ charge: "", status: "active" }}
+      onChanged={() => setDashKey((k) => k + 1)}
+      tableProps={{
+        selectable: true,
+        sortable: true,
+        hideDelete: true,
+        actionVariant: "teal",
+      }}
       topContent={
         <PageDashboard
           resource="procedures"
+          refreshKey={dashKey}
           cards={[
             { key: "total", label: "Total Procedures", icon: "📝" },
             { key: "active", label: "Active", icon: "✅" },
@@ -35,53 +60,90 @@ export default function Procedures() {
           ]}
         />
       }
-      columns={[
-        { key: "name", header: "Procedure", render: (r) => <div><div className="cell-main">{r.name}</div><div className="cell-sub">{r.code || "—"}</div></div> },
-        { key: "category", header: "Category", render: (r) => r.category },
-        { key: "charge", header: "Charge", render: (r) => money(r.charge) },
-        { key: "defaultSessions", header: "Sessions", render: (r) => r.defaultSessions },
-        { key: "branch", header: "Branch", render: (r) => r.branch?.name || "All" },
-        { key: "status", header: "Status", render: (r) => <Badge value={r.status} /> },
+      columns={({ setRows, page }) => [
+        {
+          key: "sno",
+          header: "S.No",
+          width: 72,
+          sortable: false,
+          render: (_r, rowIndex) => (page - 1) * PAGE_SIZE + rowIndex + 1,
+        },
+        {
+          key: "name",
+          header: "Procedure",
+          render: (r) => <div className="cell-main">{r.name}</div>,
+        },
+        {
+          key: "charge",
+          header: "Amount",
+          render: (r) => money(r.charge),
+        },
+        {
+          key: "status",
+          header: "Status",
+          render: (r) => {
+            const active = r.status === "active";
+            return (
+              <button
+                type="button"
+                className={`status-toggle ${active ? "is-active" : "is-inactive"}`}
+                disabled={statusBusyId === r._id}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleProcedureStatus(r, setRows);
+                }}
+                title={active ? "Set inactive" : "Set active"}
+              >
+                <span className="status-toggle-label">{active ? "Active" : "Inactive"}</span>
+                <span className="status-toggle-knob" />
+              </button>
+            );
+          },
+        },
       ]}
-      fields={[
-        { name: "name", label: "Procedure Name", required: true },
-        { name: "code", label: "Code", placeholder: "e.g. RCT" },
-        { name: "category", label: "Category", type: "select", options: CATEGORIES },
-        { name: "charge", label: "Charge (₹)", type: "number", required: true },
-        { name: "defaultSessions", label: "Default Sessions", type: "number" },
-        { name: "enterprise", label: "Enterprise", type: "select", options: enterprises },
-        { name: "branch", label: "Branch", type: "clinicBranch" },
-        { name: "description", label: "Description", type: "textarea", full: true },
-        { name: "status", label: "Status", type: "select", options: STATUS },
-      ]}
+      fields={() => []}
+      renderForm={({ values, setValues, editing }) => (
+        <FormFields
+          values={values}
+          onChange={setValues}
+          fields={[
+            {
+              name: "name",
+              label: "Procedure Name",
+              required: true,
+              placeholder: "Enter Procedure Name",
+              full: true,
+            },
+            {
+              name: "charge",
+              label: "Amount",
+              type: "number",
+              required: true,
+              placeholder: "Enter amount",
+              min: 0,
+              full: true,
+            },
+            ...(editing
+              ? [{ name: "status", label: "Status", type: "select", options: STATUS, full: true }]
+              : []),
+          ]}
+        />
+      )}
       toForm={(r) => ({
-        name: r.name,
-        code: r.code || "",
-        category: r.category || "General",
-        charge: r.charge ?? 0,
-        defaultSessions: r.defaultSessions ?? 1,
-        enterprise: r.enterprise?._id || "",
-        branch: r.branch?._id || "",
-        description: r.description || "",
+        name: r.name || "",
+        charge: r.charge ?? "",
         status: r.status || "active",
       })}
       toPayload={(v) => ({
-        ...v,
-        enterprise: v.enterprise || null,
-        branch: v.branch || null,
+        name: v.name,
         charge: Number(v.charge) || 0,
-        defaultSessions: Number(v.defaultSessions) || 1,
+        status: v.status || "active",
       })}
       renderView={(r) => (
         <DetailGrid>
           <DetailItem label="Name" value={r.name} />
-          <DetailItem label="Code" value={r.code} />
-          <DetailItem label="Category" value={r.category} />
-          <DetailItem label="Charge" value={money(r.charge)} />
-          <DetailItem label="Sessions" value={r.defaultSessions} />
-          <DetailItem label="Branch" value={r.branch?.name} />
+          <DetailItem label="Amount" value={money(r.charge)} />
           <DetailItem label="Status" value={<Badge value={r.status} />} />
-          <DetailItem label="Description" value={r.description} full />
         </DetailGrid>
       )}
     />

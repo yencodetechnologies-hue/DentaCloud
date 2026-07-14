@@ -65,7 +65,6 @@ export default function Dashboard() {
   }, [branchId, enterpriseFilter, toast]);
 
   const stats = data?.stats || {};
-  const maxRevenue = Math.max(1, ...(data?.branchwise || []).map((b) => b.revenue));
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   const firstName = (user?.name || "Admin").split(" ")[0];
@@ -117,57 +116,31 @@ export default function Dashboard() {
         ))}
       </div>
 
-      <div className="grid-2">
-        <div className="panel">
-          <div className="panel-head">
-            <h3>Upcoming Appointments</h3>
-            <span className="link-btn" onClick={() => navigate("/appointments")}>View all →</span>
-          </div>
-          {loading ? (
-            <div className="table-loading">Loading…</div>
-          ) : (data?.upcoming || []).length === 0 ? (
-            <div className="empty-state"><div className="big">📅</div>No upcoming appointments</div>
-          ) : (
-            data.upcoming.map((a) => (
-              <div className="row-item" key={a._id}>
-                <div className="av">{(a.patient?.name || "?").split(" ").map((p) => p[0]).slice(0, 2).join("")}</div>
-                <div className="info">
-                  <div className="nm">{a.patient?.name} — {a.treatment || "Consultation"}</div>
-                  <div className="sub">{a.doctor?.name} · {a.branch?.name}</div>
-                </div>
-                {a.patient?.phone && (
-                  <a href={`tel:${a.patient.phone.replace(/[^\d+]/g, "")}`} className="icon-btn" title="Call patient" onClick={(e) => e.stopPropagation()}>📞</a>
-                )}
-                <span className={`status-dot ${a.status === "confirmed" || a.status === "completed" ? "green" : "amber"}`}></span>
-                <div className="time">{a.time || fmtTime(a.date)}</div>
+      <div className="panel">
+        <div className="panel-head">
+          <h3>Upcoming Appointments</h3>
+          <span className="link-btn" onClick={() => navigate("/appointments")}>View all →</span>
+        </div>
+        {loading ? (
+          <div className="table-loading">Loading…</div>
+        ) : (data?.upcoming || []).length === 0 ? (
+          <div className="empty-state"><div className="big">📅</div>No upcoming appointments</div>
+        ) : (
+          data.upcoming.map((a) => (
+            <div className="row-item" key={a._id}>
+              <div className="av">{(a.patient?.name || "?").split(" ").map((p) => p[0]).slice(0, 2).join("")}</div>
+              <div className="info">
+                <div className="nm">{a.patient?.name} — {a.treatment || "Consultation"}</div>
+                <div className="sub">{a.doctor?.name} · {a.branch?.name}</div>
               </div>
-            ))
-          )}
-        </div>
-
-        <div className="panel">
-          <div className="panel-head">
-            <h3>Branch-wise Today</h3>
-            <span className="link-btn" onClick={() => navigate("/branches")}>All branches →</span>
-          </div>
-          <div className="branch-bar-list">
-            {loading ? (
-              <div className="table-loading">Loading…</div>
-            ) : (
-              (data?.branchwise || []).map((b) => (
-                <div className="b-row" key={b.id}>
-                  <div className="b-top">
-                    <span>{b.name}</span>
-                    <span>{b.appts} appts · ₹{b.revenue.toLocaleString("en-IN")}</span>
-                  </div>
-                  <div className="bar-track">
-                    <div className="bar-fill" style={{ width: `${Math.round((b.revenue / maxRevenue) * 100)}%` }}></div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
+              {a.patient?.phone && (
+                <a href={`tel:${a.patient.phone.replace(/[^\d+]/g, "")}`} className="icon-btn" title="Call patient" onClick={(e) => e.stopPropagation()}>📞</a>
+              )}
+              <span className={`status-dot ${a.status === "confirmed" || a.status === "completed" ? "green" : "amber"}`}></span>
+              <div className="time">{a.time || fmtTime(a.date)}</div>
+            </div>
+          ))
+        )}
       </div>
 
       <div className="panel">

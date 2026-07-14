@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import CrudPage from "../components/CrudPage.jsx";
 import PageDashboard from "../components/PageDashboard.jsx";
 import Badge from "../components/Badge.jsx";
@@ -151,6 +152,9 @@ function InvoiceForm({ values, setValues, patients, procedures = [] }) {
 }
 
 export default function Billing() {
+  const [searchParams] = useSearchParams();
+  const statusFromUrl = searchParams.get("status") || "";
+  const isBilledView = statusFromUrl === "paid";
   const patients = useOptions("patients", (p) => ({ value: p._id, label: p.name }));
   const [procedures, setProcedures] = useState([]);
   const toast = useToast();
@@ -181,10 +185,17 @@ export default function Billing() {
 
   return (
     <CrudPage
-      title="Billing"
-      subtitle="Create invoices, apply GST and track patient payments."
+      key={statusFromUrl || "all"}
+      title={isBilledView ? "Billed" : "Billing"}
+      subtitle={
+        isBilledView
+          ? "Paid invoices and collected payment records."
+          : "Create invoices, apply GST and track patient payments."
+      }
       endpoint="invoices"
       singular="Invoice"
+      initialStatus={statusFromUrl}
+      hideStatusFilter={isBilledView}
       topContent={
         <PageDashboard
           resource="invoices"

@@ -10,6 +10,33 @@ const documentSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const availabilitySchema = new mongoose.Schema(
+  {
+    day: { type: String, enum: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"], required: true },
+    from: { type: String, trim: true },
+    to: { type: String, trim: true },
+  },
+  { _id: false }
+);
+
+const timeRangeSchema = new mongoose.Schema(
+  {
+    from: { type: String, trim: true },
+    to: { type: String, trim: true },
+  },
+  { _id: false }
+);
+
+const weeklyScheduleSchema = new mongoose.Schema(
+  {
+    day: { type: String, enum: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"], required: true },
+    status: { type: String, enum: ["available", "weeklyOff", "holiday"], default: "weeklyOff" },
+    slots: { type: [timeRangeSchema], default: [] },
+    breaks: { type: [timeRangeSchema], default: [] },
+  },
+  { _id: false }
+);
+
 const staffSchema = new mongoose.Schema(
   {
     employeeId: { type: String, unique: true, trim: true },
@@ -18,7 +45,7 @@ const staffSchema = new mongoose.Schema(
     firstName: { type: String, trim: true },
     lastNamePrefix: { type: String, trim: true },
     lastName: { type: String, trim: true },
-    role: { type: String, trim: true, default: "Receptionist" },
+    role: { type: String, trim: true, default: "Admin" },
     designation: { type: String, trim: true },
     email: { type: String, lowercase: true, trim: true },
     phone: { type: String, trim: true },
@@ -35,16 +62,16 @@ const staffSchema = new mongoose.Schema(
     image: { type: String, trim: true },
     joiningDate: { type: Date },
     weeklyOff: { type: [String], default: [] },
-    jobResponsibilities: { type: String, trim: true },
     documents: { type: [documentSchema], default: [] },
-    offerLetter: { type: String, trim: true },
     accountHolderName: { type: String, trim: true },
     accountNumber: { type: String, trim: true },
     accountType: { type: String, trim: true },
     bankName: { type: String, trim: true },
     bankBranchName: { type: String, trim: true },
     ifscCode: { type: String, trim: true, uppercase: true },
-    shift: { type: String, enum: ["morning", "evening", "night", "full-day"], default: "morning" },
+    upiId: { type: String, trim: true },
+    availability: { type: [availabilitySchema], default: [] },
+    weeklySchedule: { type: [weeklyScheduleSchema], default: [] },
     salary: { type: Number, default: 0 },
     branch: { type: mongoose.Schema.Types.ObjectId, ref: "Branch" },
     status: { type: String, enum: ["active", "inactive"], default: "active" },

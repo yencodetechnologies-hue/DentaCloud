@@ -19,9 +19,14 @@ export default function Layout() {
 
   useEffect(() => {
     setDrawerOpen(false);
-  }, [location.pathname]);
+  }, [location.pathname, location.search]);
 
-  const current = MENU.find((m) => m.path === location.pathname);
+  const currentPath = `${location.pathname}${location.search || ""}`;
+  const current = MENU.find((m) => {
+    if (!m.path) return false;
+    if (m.path.includes("?")) return m.path === currentPath;
+    return m.path === location.pathname && !location.search;
+  }) || MENU.find((m) => m.path === location.pathname);
   const roleLabel = (user?.role || "dental-admin").replace("-", " ");
   const visibleMenu = MENU.filter((item) => {
     if (item.accountTypes && !item.accountTypes.includes(user?.accountType || "clinic")) return false;
@@ -32,9 +37,24 @@ export default function Layout() {
   // drop section headers that end up with no visible items under them
   const menu = visibleMenu.filter((item, i) => {
     if (!item.section) return true;
-    const next = visibleMenu[i + 1];
-    return next && !next.section;
+    for (let j = i + 1; j < visibleMenu.length; j++) {
+      if (visibleMenu[j].section) return false;
+      return true;
+    }
+    return false;
   });
+
+  function navIsActive(itemPath, isActive) {
+    if (itemPath.includes("?")) {
+      return currentPath === itemPath;
+    }
+    // Prefer the query-string sibling when it matches (e.g. Billing vs Billed)
+    const querySiblingActive = MENU.some(
+      (m) => m.path?.startsWith(`${itemPath}?`) && m.path === currentPath
+    );
+    if (querySiblingActive) return false;
+    return isActive;
+  }
 
   return (
     <div className="app-shell">
@@ -69,8 +89,8 @@ export default function Layout() {
               <NavLink
                 key={item.id}
                 to={item.path}
-                end={item.path === "/"}
-                className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}
+                end={item.path === "/" || item.path.includes("?")}
+                className={({ isActive }) => `nav-item ${navIsActive(item.path, isActive) ? "active" : ""}`}
                 title={item.label}
                 onClick={() => setDrawerOpen(false)}
               >

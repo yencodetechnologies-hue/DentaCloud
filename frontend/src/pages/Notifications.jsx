@@ -31,8 +31,8 @@ function fmtDateTime(d) {
 export default function Notifications() {
   return (
     <CrudPage
-      title="Notifications"
-      subtitle="Log of appointment, follow-up, payment and stock reminders."
+      title="Reminder"
+      subtitle="Appointment, follow-up, payment and stock reminders."
       endpoint="notifications"
       singular="Notification"
       topContent={

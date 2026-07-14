@@ -2,10 +2,22 @@ import { useEffect, useMemo, useState } from "react";
 import api, { apiError } from "../api/client.js";
 import { useToast } from "../context/ToastContext.jsx";
 import ClinicBranchField from "./ClinicBranchField.jsx";
+import ProfilePictureField from "./ProfilePictureField.jsx";
 
+const TITLE_OPTIONS = ["Baby.", "Mast.", "Mr.", "Mrs.", "Ms.", "Dr."];
+const RELATION_OPTIONS = ["D/o", "F/o", "H/o", "M/o", "S/o", "W/o"];
+const ALT_RELATION_OPTIONS = ["Father", "Daughter", "Mother", "Son", "Sister", "Spouse"];
 const GENDERS = [
   { value: "male", label: "Male" },
   { value: "female", label: "Female" },
+  { value: "other", label: "Other" },
+];
+const SOURCE_OPTIONS = [
+  { value: "walk-in", label: "Walk-in" },
+  { value: "patient-reference", label: "Patient reference" },
+  { value: "doctor-reference", label: "Doctor reference" },
+  { value: "website", label: "Website" },
+  { value: "social-media", label: "Social media" },
   { value: "other", label: "Other" },
 ];
 
@@ -26,6 +38,10 @@ const REASONS = [
   { value: "cosmetic", label: "Cosmetic treatment" },
   { value: "emergency", label: "Emergency" },
 ];
+
+const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
+
+const optionObjects = (items) => items.map((value) => ({ value, label: value }));
 
 function getPath(obj, path) {
   return path.split(".").reduce((acc, k) => (acc == null ? acc : acc[k]), obj);
@@ -94,45 +110,98 @@ export default function PatientForm({ values, setValues, editing }) {
   }
 
   return (
-    <div className="patient-form">
-      <h4 className="form-section-title">Patient details</h4>
+    <div className="patient-form doctor-form">
       <div className="form-grid">
-        <Field label="Full Name" req>
-          <input value={val("name")} onChange={(e) => set("name", e.target.value)} placeholder="e.g. Priya Sharma" required />
+        <Field label="Name" req>
+          <div className="input-pair select-first">
+            <select value={val("titlePrefix") || "Baby."} onChange={(e) => set("titlePrefix", e.target.value)}>
+              {optionObjects(TITLE_OPTIONS).map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+            <input value={val("firstName")} onChange={(e) => set("firstName", e.target.value)} placeholder="Enter Name" required />
+          </div>
+        </Field>
+        <Field label="Last Name">
+          <div className="input-pair select-first">
+            <select value={val("lastNamePrefix") || "D/o"} onChange={(e) => set("lastNamePrefix", e.target.value)}>
+              {optionObjects(RELATION_OPTIONS).map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+            <input value={val("lastName")} onChange={(e) => set("lastName", e.target.value)} placeholder="Enter Last Name" />
+          </div>
+        </Field>
+        <Field label="Phone Number" req>
+          <input value={val("phone")} onChange={(e) => set("phone", e.target.value)} placeholder="Enter Phone Number" required />
+        </Field>
+        <Field label="Alternative Phone Number">
+          <div className="input-pair select-first">
+            <select value={val("altPhoneRelation") || "Father"} onChange={(e) => set("altPhoneRelation", e.target.value)}>
+              {optionObjects(ALT_RELATION_OPTIONS).map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+            <input value={val("altPhone")} onChange={(e) => set("altPhone", e.target.value)} placeholder="Enter Alternative Phone" />
+          </div>
+        </Field>
+        <Field label="Email" req>
+          <input type="email" value={val("email")} onChange={(e) => set("email", e.target.value)} placeholder="Enter Email" required />
         </Field>
         <Field label="Gender" req>
           <select value={val("gender")} onChange={(e) => set("gender", e.target.value)} required>
-            {GENDERS.map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
+            {GENDERS.map((g) => (
+              <option key={g.value} value={g.value}>{g.label}</option>
+            ))}
           </select>
         </Field>
-        <Field label="Date of Birth" req>
+        <div className="form-grid compact-row">
+          <Field label="Date of Birth" req>
+            <input
+              type="date"
+              value={val("dob") ? String(val("dob")).slice(0, 10) : ""}
+              onChange={(e) => {
+                const dob = e.target.value;
+                setValues({
+                  ...values,
+                  dob,
+                  age: dob ? ageFromDob(dob) : values.age,
+                });
+              }}
+              required={!val("age")}
+            />
+          </Field>
+          <Field label="Age">
+            <input
+              type="number"
+              min={0}
+              value={val("dob") ? dobAge : val("age")}
+              disabled={!!val("dob")}
+              readOnly={!!val("dob")}
+              onChange={(e) => set("age", e.target.value === "" ? "" : Number(e.target.value))}
+              placeholder={val("dob") ? "" : "Enter Age"}
+              required={!val("dob")}
+            />
+          </Field>
+        </div>
+        <Field label="Address" req>
           <input
-            type="date"
-            value={val("dob") ? String(val("dob")).slice(0, 10) : ""}
-            onChange={(e) => {
-              const dob = e.target.value;
-              setValues({
-                ...values,
-                dob,
-                age: dob ? ageFromDob(dob) : values.age,
-              });
-            }}
-            required={!val("age")}
+            value={val("address.street")}
+            onChange={(e) => set("address.street", e.target.value)}
+            placeholder="Enter Address"
+            required
           />
         </Field>
-        <Field label="Age">
-          <input
-            type="number"
-            min={0}
-            value={val("dob") ? dobAge : val("age")}
-            disabled={!!val("dob")}
-            readOnly={!!val("dob")}
-            onChange={(e) => set("age", e.target.value === "" ? "" : Number(e.target.value))}
-            required={!val("dob")}
-          />
+        <Field label="Source Of Reference" req>
+          <select value={val("sourceOfReference")} onChange={(e) => set("sourceOfReference", e.target.value)} required>
+            <option value="">Select…</option>
+            {SOURCE_OPTIONS.map((s) => (
+              <option key={s.value} value={s.value}>{s.label}</option>
+            ))}
+          </select>
         </Field>
-        <Field label="Mobile Number" req>
-          <input value={val("phone")} onChange={(e) => set("phone", e.target.value)} placeholder="10-digit mobile" required />
+        <Field label="Reference By">
+          <input value={val("referredBy")} onChange={(e) => set("referredBy", e.target.value)} placeholder="Enter Reference By" />
         </Field>
         <ClinicBranchField
           value={val("branch")}
@@ -141,7 +210,9 @@ export default function PatientForm({ values, setValues, editing }) {
         <Field label="Reason for visit">
           <select value={val("reasonForVisit")} onChange={(e) => set("reasonForVisit", e.target.value)}>
             <option value="">Select…</option>
-            {REASONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+            {REASONS.map((r) => (
+              <option key={r.value} value={r.value}>{r.label}</option>
+            ))}
           </select>
         </Field>
         {editing && (
@@ -157,12 +228,21 @@ export default function PatientForm({ values, setValues, editing }) {
         </Field>
       </div>
 
-      <PhotoUpload
-        url={val("photo")}
-        uploading={uploading === "photo"}
-        onPick={(f) => uploadFile("photo", f)}
-        onClear={() => set("photo", "")}
-      />
+      <div className="doctor-form-panel" style={{ marginTop: 12 }}>
+        <div className="doctor-form-panel-copy">
+          <div className="doctor-form-panel-title">Profile Picture</div>
+          <p className="doctor-form-panel-hint">Upload a clear square photo. JPG or PNG works best.</p>
+        </div>
+        <div className="doctor-form-panel-body">
+          <ProfilePictureField
+            url={val("photo")}
+            uploading={uploading === "photo"}
+            alt="Patient profile"
+            onPick={(f) => uploadFile("photo", f)}
+            onClear={() => set("photo", "")}
+          />
+        </div>
+      </div>
 
       <button
         type="button"
@@ -176,24 +256,13 @@ export default function PatientForm({ values, setValues, editing }) {
         <div className="form-more fade-up">
           <h4 className="form-section-title">Contact</h4>
           <div className="form-grid">
-            <Field label="Alternate Number">
-              <input value={val("altPhone")} onChange={(e) => set("altPhone", e.target.value)} />
-            </Field>
-            <Field label="Email">
-              <input type="email" value={val("email")} onChange={(e) => set("email", e.target.value)} />
-            </Field>
             <Field label="Blood Group">
-              <input value={val("bloodGroup")} onChange={(e) => set("bloodGroup", e.target.value)} placeholder="e.g. O+" />
-            </Field>
-            <Field label="Referred By" hint="Friend / doctor / social media">
-              <input value={val("referredBy")} onChange={(e) => set("referredBy", e.target.value)} />
-            </Field>
-            <Field label="Address" full>
-              <textarea
-                value={val("address.street")}
-                onChange={(e) => set("address.street", e.target.value)}
-                placeholder="House/Flat, Street, Area, City, Pincode"
-              />
+              <select value={val("bloodGroup")} onChange={(e) => set("bloodGroup", e.target.value)}>
+                <option value="">Select…</option>
+                {BLOOD_GROUPS.map((bg) => (
+                  <option key={bg} value={bg}>{bg}</option>
+                ))}
+              </select>
             </Field>
           </div>
 
@@ -224,12 +293,14 @@ export default function PatientForm({ values, setValues, editing }) {
           </div>
 
           <h4 className="form-section-title">Dental history</h4>
-          <div className="form-grid">
+          <div className="form-grid dental-history-row">
             <YesNo label="Previous dental treatment" value={!!values.previousTreatment} onChange={(v) => set("previousTreatment", v)} />
             <Field label="Last dental visit">
               <input type="date" value={val("lastVisitDate") ? String(val("lastVisitDate")).slice(0, 10) : ""} onChange={(e) => set("lastVisitDate", e.target.value)} />
             </Field>
             <YesNo label="Gum bleeding issues" value={!!values.gumBleeding} onChange={(v) => set("gumBleeding", v)} />
+          </div>
+          <div className="form-grid" style={{ marginTop: 18 }}>
             <Field label="Tooth pain history" full>
               <textarea value={val("toothPainHistory")} onChange={(e) => set("toothPainHistory", e.target.value)} />
             </Field>
@@ -264,12 +335,6 @@ export default function PatientForm({ values, setValues, editing }) {
             <Field label="Comments" full>
               <textarea value={val("comments")} onChange={(e) => set("comments", e.target.value)} />
             </Field>
-            <Field label="Doctor instructions" full>
-              <textarea value={val("doctorInstructions")} onChange={(e) => set("doctorInstructions", e.target.value)} />
-            </Field>
-            <Field label="Special notes" full>
-              <textarea value={val("specialNotes")} onChange={(e) => set("specialNotes", e.target.value)} />
-            </Field>
           </div>
         </div>
       )}
@@ -293,26 +358,6 @@ function YesNo({ label, value, onChange }) {
       <div className="yesno">
         <button type="button" className={value ? "on" : ""} onClick={() => onChange(true)}>Yes</button>
         <button type="button" className={!value ? "on" : ""} onClick={() => onChange(false)}>No</button>
-      </div>
-    </div>
-  );
-}
-
-function PhotoUpload({ url, uploading, onPick, onClear }) {
-  return (
-    <div className="photo-upload">
-      <div className="photo-frame">
-        {url ? <img src={url} alt="Patient" /> : <span>👤</span>}
-      </div>
-      <div className="photo-actions">
-        <div className="field-label">Patient Photo <span className="hint">optional</span></div>
-        <div className="row">
-          <label className="upload-btn">
-            {uploading ? "Uploading…" : url ? "Change photo" : "Upload photo"}
-            <input type="file" accept="image/*" hidden onChange={(e) => onPick(e.target.files?.[0])} />
-          </label>
-          {url && <button type="button" className="btn btn-ghost sm" onClick={onClear}>Remove</button>}
-        </div>
       </div>
     </div>
   );

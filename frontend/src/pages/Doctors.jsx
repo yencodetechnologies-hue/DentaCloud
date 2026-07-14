@@ -4,6 +4,7 @@ import PageDashboard from "../components/PageDashboard.jsx";
 import Badge from "../components/Badge.jsx";
 import ClinicBranchField from "../components/ClinicBranchField.jsx";
 import BusinessHoursEditor from "../components/BusinessHoursEditor.jsx";
+import ProfilePictureField from "../components/ProfilePictureField.jsx";
 import { DetailGrid, DetailItem } from "../components/Detail.jsx";
 import api, { apiError } from "../api/client.js";
 import { useToast } from "../context/ToastContext.jsx";
@@ -77,6 +78,34 @@ function formatAvailability(availability) {
 
 export default function Doctors() {
   const [dashKey, setDashKey] = useState(0);
+  const toast = useToast();
+  const [statusBusyId, setStatusBusyId] = useState(null);
+
+  async function toggleDoctorStatus(row, setRows) {
+    const nextStatus = row.status === "active" ? "inactive" : "active";
+    setStatusBusyId(row._id);
+    try {
+      await api.put(`/doctors/${row._id}`, { status: nextStatus });
+      setRows?.((prev) => prev.map((r) => (r._id === row._id ? { ...r, status: nextStatus } : r)));
+      toast.success(`Doctor marked ${nextStatus}`);
+      setDashKey((k) => k + 1);
+    } catch (err) {
+      toast.error(apiError(err));
+    } finally {
+      setStatusBusyId(null);
+    }
+  }
+
+  function formatGender(g) {
+    if (!g) return "-";
+    return g.charAt(0).toUpperCase() + g.slice(1);
+  }
+
+  function formatAltNumber(r) {
+    if (!r.alternativePhone) return "";
+    if (r.altPhoneRelation) return `${r.altPhoneRelation} ( ${r.alternativePhone} )`;
+    return r.alternativePhone;
+  }
 
   return (
     <CrudPage
@@ -88,6 +117,12 @@ export default function Doctors() {
       hideDefaultFooter
       statusOptions={STATUS_OPTIONS}
       onChanged={() => setDashKey((k) => k + 1)}
+      tableProps={{
+        selectable: true,
+        sortable: true,
+        hideDelete: true,
+        actionVariant: "teal",
+      }}
       topContent={
         <PageDashboard
           resource="doctors"
@@ -106,26 +141,61 @@ export default function Doctors() {
         gender: "male",
         status: "active",
       }}
-      columns={[
+      columns={({ setRows, page }) => [
+        {
+          key: "sno",
+          header: "S.No",
+          width: 72,
+          sortable: false,
+          render: (_r, rowIndex) => (page - 1) * 10 + rowIndex + 1,
+        },
         {
           key: "name",
-          header: "Doctor",
+          header: "Name",
           render: (r) => (
-            <div className="cell-avatar">
-              {r.image ? <img className="av av-img" src={r.image} alt={r.name} /> : <div className="av">{(r.name || "").slice(0, 2)}</div>}
-              <div>
-                <div className="cell-main">{r.name}</div>
-                <div className="cell-sub">{doctorAddressFromRecord(r) || "-"}</div>
-              </div>
-            </div>
+            <span className="cell-main">
+              {r.name || "-"}
+              {r.phone ? ` ( ${r.phone} )` : ""}
+            </span>
           ),
         },
-        { key: "branch", header: "Branch", render: (r) => r.branch?.name || "-" },
-        { key: "phone", header: "Phone", render: (r) => r.phone || "-" },
-        { key: "upid", header: "UPID", render: (r) => r.upid || "-" },
-        { key: "dciRegNo", header: "DCI Reg", render: (r) => r.dciRegNo || "-" },
-        { key: "email", header: "Email", render: (r) => r.email || "-" },
-        { key: "status", header: "Status", render: (r) => <Badge value={r.status} /> },
+        {
+          key: "email",
+          header: "Email",
+          render: (r) => r.email || "-",
+        },
+        {
+          key: "gender",
+          header: "Gender",
+          render: (r) => formatGender(r.gender),
+        },
+        {
+          key: "alternativePhone",
+          header: "Alternative Number",
+          render: (r) => formatAltNumber(r) || "",
+        },
+        {
+          key: "status",
+          header: "Status",
+          render: (r) => {
+            const active = r.status === "active";
+            return (
+              <button
+                type="button"
+                className={`status-toggle ${active ? "is-active" : "is-inactive"}`}
+                disabled={statusBusyId === r._id}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleDoctorStatus(r, setRows);
+                }}
+                title={active ? "Set inactive" : "Set active"}
+              >
+                <span className="status-toggle-label">{active ? "Active" : "Inactive"}</span>
+                <span className="status-toggle-knob" />
+              </button>
+            );
+          },
+        },
       ]}
       fields={() => []}
       renderForm={({ values, setValues }) => (
@@ -163,6 +233,7 @@ export default function Doctors() {
           dciRegNo: r.dciRegNo || "",
           specialization: r.specialization || "",
           feeStructure: r.feeStructure || [],
+          weeklySchedule: r.weeklySchedule || [],
           availability: r.availability || [],
 
           accountHolderName: r.accountHolderName || "",
@@ -199,7 +270,13 @@ export default function Doctors() {
         degrees: v.degrees || {},
         dciRegNo: v.dciRegNo || "",
         specialization: v.specialization || "",
-        availability: v.availability || [],
+        weeklySchedule: (v.weeklySchedule || []).map((day) => ({
+          day: day.day,
+          status: day.status === "available" ? "available" : "weeklyOff",
+          slots: (day.slots || []).filter((s) => s?.from && s?.to).map((s) => ({ from: s.from, to: s.to })),
+          breaks: [],
+        })),
+        availability: (v.availability || []).filter((s) => s?.day && s?.from && s?.to),
         feeStructure: v.feeStructure || [],
 
         accountHolderName: v.accountHolderName || "",
@@ -224,7 +301,6 @@ export default function Doctors() {
           <DetailItem label="Date of Birth" value={r.dob ? new Date(r.dob).toLocaleDateString("en-IN") : "-"} />
           <DetailItem label="Age" value={r.dob ? ageFromDob(r.dob) : r.age} />
           <DetailItem label="Address" value={doctorAddressFromRecord(r) || "-"} full />
-          <DetailItem label="UPID" value={r.upid} />
           <DetailItem label="Qualification" value={r.qualification || "-"} />
           <DetailItem label="DCI Registration" value={r.dciRegNo} />
           <DetailItem label="BDS Passing Out Year" value={r.degrees?.bdsYear ?? "-"} />
@@ -246,7 +322,7 @@ export default function Doctors() {
           <DetailItem label="Bank Name" value={r.bankName || "-"} />
           <DetailItem label="Bank Branch Name" value={r.bankBranchName || "-"} />
           <DetailItem label="IFSC Code" value={r.ifscCode || "-"} />
-          <DetailItem label="UPI ID" value={r.upiId || "-"} />
+          <DetailItem label="Bank UPI ID" value={r.upiId || "-"} />
           <DetailItem label="Branch" value={r.branch?.name} />
           <DetailItem label="Status" value={<Badge value={r.status} />} />
           {r.image && <DetailItem label="Image" value={<a href={r.image} target="_blank" rel="noreferrer">View image</a>} />}
@@ -264,9 +340,12 @@ function DoctorWizardForm({ values, setValues }) {
   const computedAge = useMemo(() => ageFromDob(values.dob), [values.dob]);
 
   useEffect(() => {
-    if (!values.dob || computedAge === "" || values.age === computedAge) return;
-    setValues({ ...values, age: computedAge });
-  }, [computedAge, setValues, values]);
+    if (!values.dob || computedAge === "") return;
+    setValues((prev) => {
+      if (!prev || prev.age === computedAge) return prev;
+      return { ...prev, age: computedAge };
+    });
+  }, [computedAge, setValues, values.dob]);
 
   // reset wizard when opening a new record / edit
   useEffect(() => {
@@ -290,12 +369,16 @@ function DoctorWizardForm({ values, setValues }) {
       const form = new FormData();
       form.append("file", file);
       const { data } = await api.post("/uploads", form, { headers: { "Content-Type": "multipart/form-data" } });
-      set("image", data.url);
+      setValues((prev) => ({ ...(prev || {}), image: data.url }));
     } catch (err) {
       toast.error(apiError(err));
     } finally {
       setUploading(false);
     }
+  }
+
+  function clearImage() {
+    setValues((prev) => ({ ...(prev || {}), image: "" }));
   }
 
   function vreq(label, ok) {
@@ -366,7 +449,7 @@ function DoctorWizardForm({ values, setValues }) {
       </div>
 
       {step === 0 && (
-        <>
+        <FormSection title="Basic details" hint="Personal contact info, address, and branch assignment.">
           <div className="form-grid">
             <Field label="Name" req>
               <div className="input-pair select-first">
@@ -447,160 +530,164 @@ function DoctorWizardForm({ values, setValues }) {
               </select>
             </Field>
           </div>
-        </>
+        </FormSection>
       )}
 
       {step === 1 && (
-        <>
-          <h4 className="staff-form-section">Professional Details</h4>
-          <div className="form-grid">
-            <Field label="UPID">
-              <input value={values.upid || ""} readOnly placeholder="Auto-generated" />
-            </Field>
-            <Field label="Qualification" req>
-              <input value={values.qualification || ""} onChange={(e) => set("qualification", e.target.value)} placeholder="e.g. BDS, MDS" />
-            </Field>
-            <Field label="DCI Registration No">
-              <input value={values.dciRegNo || ""} onChange={(e) => set("dciRegNo", e.target.value)} placeholder="DCI number" />
-            </Field>
-            <Field label="BDS Passing Out Year" req>
-              <input
-                type="number"
-                min={1900}
-                max={2100}
-                value={values.degrees?.bdsYear ?? ""}
-                onChange={(e) => set("degrees", { ...values.degrees, bdsYear: e.target.value === "" ? null : Number(e.target.value) })}
-                placeholder="e.g. 2018"
-              />
-            </Field>
-            <Field label="MDS Passing Out Year">
-              <input
-                type="number"
-                min={1900}
-                max={2100}
-                value={values.degrees?.mdsYear ?? ""}
-                onChange={(e) => set("degrees", { ...values.degrees, mdsYear: e.target.value === "" ? null : Number(e.target.value) })}
-                placeholder="e.g. 2021"
-              />
-            </Field>
-            <Field label="Specialization">
-              <input value={values.specialization || ""} onChange={(e) => set("specialization", e.target.value)} />
-            </Field>
-          </div>
+        <div className="doctor-form-sections">
+          <FormSection title="Professional details" hint="Qualifications, registration, and specialization.">
+            <div className="form-grid">
+              <Field label="Qualification" req>
+                <input value={values.qualification || ""} onChange={(e) => set("qualification", e.target.value)} placeholder="e.g. BDS, MDS" />
+              </Field>
+              <Field label="DCI Registration No">
+                <input value={values.dciRegNo || ""} onChange={(e) => set("dciRegNo", e.target.value)} placeholder="DCI number" />
+              </Field>
+              <Field label="BDS Passing Out Year" req>
+                <input
+                  type="number"
+                  min={1900}
+                  max={2100}
+                  value={values.degrees?.bdsYear ?? ""}
+                  onChange={(e) => set("degrees", { ...values.degrees, bdsYear: e.target.value === "" ? null : Number(e.target.value) })}
+                  placeholder="e.g. 2018"
+                />
+              </Field>
+              <Field label="MDS Passing Out Year">
+                <input
+                  type="number"
+                  min={1900}
+                  max={2100}
+                  value={values.degrees?.mdsYear ?? ""}
+                  onChange={(e) => set("degrees", { ...values.degrees, mdsYear: e.target.value === "" ? null : Number(e.target.value) })}
+                  placeholder="e.g. 2021"
+                />
+              </Field>
+              <Field label="Specialization">
+                <input value={values.specialization || ""} onChange={(e) => set("specialization", e.target.value)} />
+              </Field>
+            </div>
+          </FormSection>
 
-          <h4 className="staff-form-section">Fee Structure</h4>
-          <div className="fee-structure">
-            {(values.feeStructure || []).map((row, i) => (
-              <div key={i} className="fee-structure-row">
-                <Field label="Procedure" req>
-                  <select
-                    value={row.procedureRef || ""}
-                    onChange={(e) => {
-                      const id = e.target.value;
-                      const proc = procedures.find((p) => p._id === id);
-                      const next = [...(values.feeStructure || [])];
-                      next[i] = {
-                        ...next[i],
-                        procedureRef: id || null,
-                        procedure: proc?.name || next[i]?.procedure || "",
-                        fee: Number(proc?.charge ?? next[i]?.fee ?? 0),
-                      };
-                      set("feeStructure", next);
-                    }}
-                  >
-                    <option value="">Select Procedure</option>
-                    {procedures.map((p) => (
-                      <option key={p._id} value={p._id}>
-                        {p.name} — ₹{Number(p.charge || 0)}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="Fee (₹)" req>
-                  <input
-                    type="number"
-                    min={0}
-                    value={row.fee ?? 0}
-                    onChange={(e) => {
-                      const next = [...(values.feeStructure || [])];
-                      next[i] = { ...next[i], fee: Number(e.target.value) };
-                      set("feeStructure", next);
-                    }}
-                  />
-                </Field>
-                <div className="fee-structure-actions">
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    onClick={() => set("feeStructure", (values.feeStructure || []).filter((_, idx) => idx !== i))}
-                  >
-                    Remove
-                  </button>
+          <FormSection title="Fee structure" hint="Set procedure fees for this doctor.">
+            <div className="fee-structure">
+              {(values.feeStructure || []).map((row, i) => (
+                <div key={i} className="fee-structure-row">
+                  <Field label="Procedure" req>
+                    <select
+                      value={row.procedureRef || ""}
+                      onChange={(e) => {
+                        const id = e.target.value;
+                        const proc = procedures.find((p) => p._id === id);
+                        const next = [...(values.feeStructure || [])];
+                        next[i] = {
+                          ...next[i],
+                          procedureRef: id || null,
+                          procedure: proc?.name || next[i]?.procedure || "",
+                          fee: Number(proc?.charge ?? next[i]?.fee ?? 0),
+                        };
+                        set("feeStructure", next);
+                      }}
+                    >
+                      <option value="">Select Procedure</option>
+                      {procedures.map((p) => (
+                        <option key={p._id} value={p._id}>
+                          {p.name} — ₹{Number(p.charge || 0)}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="Fee (₹)" req>
+                    <input
+                      type="number"
+                      min={0}
+                      value={row.fee ?? 0}
+                      onChange={(e) => {
+                        const next = [...(values.feeStructure || [])];
+                        next[i] = { ...next[i], fee: Number(e.target.value) };
+                        set("feeStructure", next);
+                      }}
+                    />
+                  </Field>
+                  <div className="fee-structure-actions">
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => set("feeStructure", (values.feeStructure || []).filter((_, idx) => idx !== i))}
+                    >
+                      Remove
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
-            <button
-              type="button"
-              className="btn btn-sm"
-              onClick={() => set("feeStructure", [...(values.feeStructure || []), { procedureRef: null, procedure: "", fee: 0 }])}
-            >
-              + Add procedure
-            </button>
-          </div>
-
-          <h4 className="staff-form-section">Bank Details</h4>
-          <div className="form-grid">
-            <Field label="Account Holder Name" req>
-              <input value={values.accountHolderName || ""} onChange={(e) => set("accountHolderName", e.target.value)} placeholder="Enter Account Holder Name" />
-            </Field>
-            <Field label="Account Number" req>
-              <input value={values.accountNumber || ""} onChange={(e) => set("accountNumber", e.target.value)} />
-            </Field>
-            <Field label="Account Type" req>
-              <select value={values.accountType || ""} onChange={(e) => set("accountType", e.target.value)}>
-                <option value="">Select Account Type</option>
-                {optionObjects(ACCOUNT_TYPES).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-            </Field>
-            <Field label="Bank Name" req>
-              <input value={values.bankName || ""} onChange={(e) => set("bankName", e.target.value)} placeholder="Enter Bank Name" />
-            </Field>
-            <Field label="Bank Branch Name" req>
-              <input value={values.bankBranchName || ""} onChange={(e) => set("bankBranchName", e.target.value)} placeholder="Enter Branch Name" />
-            </Field>
-            <Field label="IFSC Code" req>
-              <input value={values.ifscCode || ""} onChange={(e) => set("ifscCode", e.target.value.toUpperCase())} placeholder="Enter IFSC Code" />
-            </Field>
-            <Field label="UPI ID">
-              <input value={values.upiId || ""} onChange={(e) => set("upiId", e.target.value)} placeholder="e.g. name@bank" />
-            </Field>
-          </div>
-
-          <h4 className="staff-form-section">Availability</h4>
-          <BusinessHoursEditor
-            value={(values.weeklySchedule && values.weeklySchedule.length ? values.weeklySchedule : values.availability) || []}
-            onChange={(next) => {
-              set("weeklySchedule", next.weeklySchedule || []);
-              set("availability", next.availability || []);
-            }}
-          />
-
-          <div className="form-grid">
-            <div className="field">
-              <label>Image</label>
-              <label className="doctor-browse">
-                {uploading ? "Uploading..." : "Browse"}
-                <input type="file" accept="image/*" hidden onChange={(e) => uploadImage(e.target.files?.[0])} />
-              </label>
+              ))}
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={() => set("feeStructure", [...(values.feeStructure || []), { procedureRef: null, procedure: "", fee: 0 }])}
+              >
+                + Add procedure
+              </button>
             </div>
-            <div className="doctor-avatar-preview">
-              {values.image ? <img src={values.image} alt="Doctor" /> : <span />}
+          </FormSection>
+
+          <FormSection title="Bank details" hint="Account information used for payouts.">
+            <div className="form-grid">
+              <Field label="Account Holder Name" req>
+                <input value={values.accountHolderName || ""} onChange={(e) => set("accountHolderName", e.target.value)} placeholder="Enter Account Holder Name" />
+              </Field>
+              <Field label="Account Number" req>
+                <input value={values.accountNumber || ""} onChange={(e) => set("accountNumber", e.target.value)} />
+              </Field>
+              <Field label="Account Type" req>
+                <select value={values.accountType || ""} onChange={(e) => set("accountType", e.target.value)}>
+                  <option value="">Select Account Type</option>
+                  {optionObjects(ACCOUNT_TYPES).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </Field>
+              <Field label="Bank Name" req>
+                <input value={values.bankName || ""} onChange={(e) => set("bankName", e.target.value)} placeholder="Enter Bank Name" />
+              </Field>
+              <Field label="Bank Branch Name" req>
+                <input value={values.bankBranchName || ""} onChange={(e) => set("bankBranchName", e.target.value)} placeholder="Enter Branch Name" />
+              </Field>
+              <Field label="IFSC Code" req>
+                <input value={values.ifscCode || ""} onChange={(e) => set("ifscCode", e.target.value.toUpperCase())} placeholder="Enter IFSC Code" />
+              </Field>
+              <Field label="Bank UPI ID">
+                <input value={values.upiId || ""} onChange={(e) => set("upiId", e.target.value)} placeholder="e.g. name@bank" />
+              </Field>
             </div>
-          </div>
-        </>
+          </FormSection>
+
+          <FormSection title="Availability" hint="Set weekly working hours and days off.">
+            <BusinessHoursEditor
+              value={(values.weeklySchedule && values.weeklySchedule.length ? values.weeklySchedule : values.availability) || []}
+              onChange={(next) => {
+                const nextWeeklySchedule = next?.weeklySchedule || [];
+                const nextAvailability = next?.availability || [];
+
+                setValues((prev) => ({
+                  ...(prev || {}),
+                  weeklySchedule: nextWeeklySchedule,
+                  availability: nextAvailability,
+                }));
+              }}
+            />
+          </FormSection>
+
+          <FormSection title="Profile Picture" hint="Upload a clear square photo. JPG or PNG works best.">
+            <ProfilePictureField
+              url={values.image}
+              uploading={uploading}
+              alt="Doctor profile"
+              onPick={uploadImage}
+              onClear={clearImage}
+            />
+          </FormSection>
+        </div>
       )}
 
-      <div className="wizard-nav">
+      <div className={`wizard-nav ${step === 0 ? "end" : ""}`}>
         {step === 0 ? (
           <>
             <button
@@ -633,6 +720,18 @@ function DoctorWizardForm({ values, setValues }) {
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+function FormSection({ title, hint, children }) {
+  return (
+    <div className="doctor-form-panel">
+      <div className="doctor-form-panel-copy">
+        <div className="doctor-form-panel-title">{title}</div>
+        {hint ? <p className="doctor-form-panel-hint">{hint}</p> : null}
+      </div>
+      <div className="doctor-form-panel-body">{children}</div>
     </div>
   );
 }

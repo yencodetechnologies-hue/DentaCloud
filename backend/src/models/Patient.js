@@ -36,11 +36,16 @@ const relatedPartySchema = new mongoose.Schema(
 const patientSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
+    titlePrefix: { type: String, trim: true },
+    firstName: { type: String, trim: true },
+    lastNamePrefix: { type: String, trim: true },
+    lastName: { type: String, trim: true },
     gender: { type: String, enum: ["male", "female", "other"], required: true, default: "male" },
     dob: { type: Date },
     age: { type: Number, default: 0 },
     photo: { type: String, trim: true },
     phone: { type: String, required: true, trim: true },
+    altPhoneRelation: { type: String, trim: true },
     altPhone: { type: String, trim: true },
     email: { type: String, lowercase: true, trim: true },
     address: { type: addressSchema, default: () => ({}) },
@@ -76,8 +81,6 @@ const patientSchema = new mongoose.Schema(
     xray: { type: String, trim: true },
     prescriptions: { type: [String], default: [] },
     comments: { type: String, trim: true },
-    doctorInstructions: { type: String, trim: true },
-    specialNotes: { type: String, trim: true },
     status: { type: String, enum: ["active", "inactive"], default: "active" },
   },
   { timestamps: true }

@@ -3,8 +3,8 @@ import CrudPage from "../components/CrudPage.jsx";
 import PageDashboard from "../components/PageDashboard.jsx";
 import Badge from "../components/Badge.jsx";
 import PatientForm from "../components/PatientForm.jsx";
-import QuickContact from "../components/QuickContact.jsx";
-import api from "../api/client.js";
+import api, { apiError } from "../api/client.js";
+import { useToast } from "../context/ToastContext.jsx";
 import { DetailGrid, DetailItem } from "../components/Detail.jsx";
 
 const REASON_LABELS = {
@@ -31,9 +31,26 @@ const fmtDate = (d) => (d ? new Date(d).toLocaleDateString() : "—");
 
 const fmtAddress = (a) => {
   if (!a) return "—";
-  const parts = [a.street, a.city, a.pincode].filter(Boolean);
-  return parts.length ? parts.join(", ") : "—";
+  return a.street || "—";
 };
+
+function buildPatientName(values) {
+  return [values.titlePrefix, values.firstName, values.lastName].filter(Boolean).join(" ").trim();
+}
+
+function splitLegacyName(name) {
+  const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return { titlePrefix: "Baby.", firstName: "", lastName: "" };
+  const titles = new Set(["Baby.", "Mast.", "Mr.", "Mrs.", "Ms.", "Dr."]);
+  if (titles.has(parts[0])) {
+    return {
+      titlePrefix: parts[0],
+      firstName: parts[1] || "",
+      lastName: parts.slice(2).join(" "),
+    };
+  }
+  return { titlePrefix: "Baby.", firstName: parts[0] || "", lastName: parts.slice(1).join(" ") };
+}
 
 function conditionList(medical) {
   if (!medical) return "None reported";
@@ -41,21 +58,58 @@ function conditionList(medical) {
   return on.length ? on.map((k) => CONDITION_LABELS[k]).join(", ") : "None reported";
 }
 
+const STATUS_OPTIONS = [
+  { value: "active", label: "Active" },
+  { value: "inactive", label: "Inactive" },
+];
+
 const emptyDefaults = {
   status: "active",
   gender: "male",
+  titlePrefix: "Baby.",
+  firstName: "",
+  lastNamePrefix: "D/o",
+  lastName: "",
+  altPhoneRelation: "Father",
+  altPhone: "",
+  email: "",
   age: "",
   dob: "",
   medical: {},
-  address: {},
+  address: { street: "" },
   prescriptions: [],
   relatedParty: [],
   sourceOfReference: "",
+  referredBy: "",
   previousTreatment: false,
   gumBleeding: false,
 };
 
+function patientLocation(r) {
+  if (!r) return "-";
+  return r.address?.city || r.address?.street || r.branch?.name || "-";
+}
+
 export default function Patients() {
+  const toast = useToast();
+  const [dashKey, setDashKey] = useState(0);
+  const [statusBusyId, setStatusBusyId] = useState(null);
+
+  async function togglePatientStatus(row, setRows) {
+    const nextStatus = row.status === "active" ? "inactive" : "active";
+    setStatusBusyId(row._id);
+    try {
+      await api.put(`/patients/${row._id}`, { status: nextStatus });
+      setRows?.((prev) => prev.map((r) => (r._id === row._id ? { ...r, status: nextStatus } : r)));
+      toast.success(`Patient marked ${nextStatus}`);
+      setDashKey((k) => k + 1);
+    } catch (err) {
+      toast.error(apiError(err));
+    } finally {
+      setStatusBusyId(null);
+    }
+  }
+
   return (
     <CrudPage
       title="Patients"
@@ -63,9 +117,17 @@ export default function Patients() {
       endpoint="patients"
       singular="Patient"
       wideForm
+      onChanged={() => setDashKey((k) => k + 1)}
+      tableProps={{
+        selectable: true,
+        sortable: true,
+        hideDelete: true,
+        actionVariant: "teal",
+      }}
       topContent={
         <PageDashboard
           resource="patients"
+          refreshKey={dashKey}
           cards={[
             { key: "total", label: "Total Patients", icon: "👥" },
             { key: "active", label: "Active", icon: "✅" },
@@ -73,26 +135,68 @@ export default function Patients() {
           ]}
         />
       }
-      statusOptions={[{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }]}
+      statusOptions={STATUS_OPTIONS}
       defaultValues={emptyDefaults}
-      columns={[
+      columns={({ setRows, page }) => [
+        {
+          key: "sno",
+          header: "S.No",
+          width: 72,
+          sortable: false,
+          render: (_r, rowIndex) => (page - 1) * 10 + rowIndex + 1,
+        },
         {
           key: "name",
-          header: "Patient",
+          header: "Name",
           render: (r) => (
-            <div className="cell-avatar">
-              {r.photo ? <img className="av av-img" src={r.photo} alt={r.name} /> : <div className="av">{initials(r.name)}</div>}
-              <div>
-                <div className="cell-main">{r.name}</div>
-                <div className="cell-sub">{r.patientId || "—"} · {r.age || "—"} yrs · {r.gender}</div>
-              </div>
-            </div>
+            <span className="cell-main">
+              {r.name || "-"}
+              {r.phone ? ` ( ${r.phone} )` : ""}
+            </span>
           ),
         },
-        { key: "phone", header: "Phone", render: (r) => <QuickContact phone={r.phone} patientId={r._id} patientName={r.name} /> },
-        { key: "branch", header: "Branch", render: (r) => r.branch?.name || "—" },
-        { key: "reasonForVisit", header: "Reason", render: (r) => REASON_LABELS[r.reasonForVisit] || "—" },
-        { key: "status", header: "Status", render: (r) => <Badge value={r.status} /> },
+        {
+          key: "patientId",
+          header: "User Name",
+          render: (r) => r.patientId || "-",
+        },
+        {
+          key: "email",
+          header: "Email",
+          render: (r) => r.email || "-",
+        },
+        {
+          key: "phone",
+          header: "Phone",
+          render: (r) => r.phone || "-",
+        },
+        {
+          key: "location",
+          header: "Location",
+          render: (r) => patientLocation(r),
+        },
+        {
+          key: "status",
+          header: "Status",
+          render: (r) => {
+            const active = r.status === "active";
+            return (
+              <button
+                type="button"
+                className={`status-toggle ${active ? "is-active" : "is-inactive"}`}
+                disabled={statusBusyId === r._id}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  togglePatientStatus(r, setRows);
+                }}
+                title={active ? "Set inactive" : "Set active"}
+              >
+                <span className="status-toggle-label">{active ? "Active" : "Inactive"}</span>
+                <span className="status-toggle-knob" />
+              </button>
+            );
+          },
+        },
       ]}
       fields={() => []}
       renderForm={({ values, setValues, editing }) => (
@@ -102,57 +206,71 @@ export default function Patients() {
           editing={editing}
         />
       )}
-      toForm={(r) => ({
-        name: r.name || "",
-        gender: r.gender || "male",
-        dob: r.dob || "",
-        age: r.age ?? "",
-        photo: r.photo || "",
-        phone: r.phone || "",
-        altPhone: r.altPhone || "",
-        email: r.email || "",
-        address: r.address || {},
-        patientId: r.patientId || "",
-        branch: r.branch?._id || "",
-        referredBy: r.referredBy || "",
-        sourceOfReference: r.sourceOfReference || "",
-        referredByPatient: r.referredByPatient?._id || "",
-        relatedParty: r.relatedParty || [],
-        thankYouSentAt: r.thankYouSentAt || "",
-        bloodGroup: r.bloodGroup || "",
-        medical: r.medical || {},
-        allergies: r.allergies || "",
-        currentMedications: r.currentMedications || "",
-        previousTreatment: !!r.previousTreatment,
-        lastVisitDate: r.lastVisitDate || "",
-        toothPainHistory: r.toothPainHistory || "",
-        gumBleeding: !!r.gumBleeding,
-        ongoingProblem: r.ongoingProblem || "",
-        firstVisitDate: r.firstVisitDate || "",
-        reasonForVisit: r.reasonForVisit || "",
-        idProof: r.idProof || "",
-        xray: r.xray || "",
-        prescriptions: r.prescriptions || [],
-        comments: r.comments || "",
-        doctorInstructions: r.doctorInstructions || "",
-        specialNotes: r.specialNotes || "",
-        status: r.status || "active",
-      })}
+      toForm={(r) => {
+        const legacy = splitLegacyName(r.name);
+        return {
+          name: r.name || "",
+          titlePrefix: r.titlePrefix || legacy.titlePrefix,
+          firstName: r.firstName || legacy.firstName,
+          lastNamePrefix: r.lastNamePrefix || "D/o",
+          lastName: r.lastName || legacy.lastName,
+          gender: r.gender || "male",
+          dob: r.dob || "",
+          age: r.age ?? "",
+          photo: r.photo || "",
+          phone: r.phone || "",
+          altPhoneRelation: r.altPhoneRelation || "Father",
+          altPhone: r.altPhone || "",
+          email: r.email || "",
+          address: {
+            street: [r.address?.street, r.address?.city].filter(Boolean).join(", "),
+          },
+          patientId: r.patientId || "",
+          branch: r.branch?._id || "",
+          referredBy: r.referredBy || "",
+          sourceOfReference: r.sourceOfReference || "",
+          referredByPatient: r.referredByPatient?._id || "",
+          relatedParty: r.relatedParty || [],
+          thankYouSentAt: r.thankYouSentAt || "",
+          bloodGroup: r.bloodGroup || "",
+          medical: r.medical || {},
+          allergies: r.allergies || "",
+          currentMedications: r.currentMedications || "",
+          previousTreatment: !!r.previousTreatment,
+          lastVisitDate: r.lastVisitDate || "",
+          toothPainHistory: r.toothPainHistory || "",
+          gumBleeding: !!r.gumBleeding,
+          ongoingProblem: r.ongoingProblem || "",
+          firstVisitDate: r.firstVisitDate || "",
+          reasonForVisit: r.reasonForVisit || "",
+          idProof: r.idProof || "",
+          xray: r.xray || "",
+          prescriptions: r.prescriptions || [],
+          comments: r.comments || "",
+          status: r.status || "active",
+        };
+      }}
       toPayload={(v) => {
         const { patientId, ...rest } = v;
         // Remove billing/payment fields from patient payloads.
         // (Old records may still contain these fields in the DB.)
         const { insurance, paymentPreference, ...withoutBilling } = rest;
+        const name = buildPatientName(withoutBilling) || withoutBilling.name || "";
         return {
           ...withoutBilling,
+          name,
           age: withoutBilling.age === "" ? 0 : withoutBilling.age,
           dob: withoutBilling.dob || null,
           lastVisitDate: withoutBilling.lastVisitDate || null,
           firstVisitDate: withoutBilling.firstVisitDate || null,
           branch: withoutBilling.branch || null,
           sourceOfReference: withoutBilling.sourceOfReference || "",
+          referredBy: withoutBilling.referredBy || "",
           referredByPatient: withoutBilling.referredByPatient || null,
           relatedParty: withoutBilling.relatedParty || [],
+          address: {
+            street: withoutBilling.address?.street || "",
+          },
         };
       }}
       renderView={(r) => <PatientDetailView patient={r} />}
@@ -183,11 +301,11 @@ function PatientDetailView({ patient: r }) {
           <h4 className="pv-group">Contact</h4>
           <DetailGrid>
             <DetailItem label="Mobile" value={r.phone} />
-            <DetailItem label="Alternate" value={r.altPhone} />
+            <DetailItem label="Alternate" value={r.altPhoneRelation ? `${r.altPhoneRelation}: ${r.altPhone || "—"}` : r.altPhone} />
             <DetailItem label="Email" value={r.email} />
             <DetailItem label="Blood Group" value={r.bloodGroup} />
             <DetailItem label="Branch" value={r.branch?.name} />
-            <DetailItem label="Referred By" value={r.referredBy} />
+            <DetailItem label="Reference By" value={r.referredBy} />
             <DetailItem label="Source" value={r.sourceOfReference || "—"} />
             <DetailItem label="Thank-you Email" value={r.thankYouSentAt ? new Date(r.thankYouSentAt).toLocaleString("en-IN") : "Not sent"} />
             <DetailItem label="Address" value={fmtAddress(r.address)} full />
@@ -257,13 +375,11 @@ function PatientDetailView({ patient: r }) {
             </>
           )}
 
-          {(r.comments || r.doctorInstructions || r.specialNotes) && (
+          {r.comments && (
             <>
               <h4 className="pv-group">Notes</h4>
               <DetailGrid>
                 <DetailItem label="Comments" value={r.comments} full />
-                <DetailItem label="Doctor Instructions" value={r.doctorInstructions} full />
-                <DetailItem label="Special Notes" value={r.specialNotes} full />
               </DetailGrid>
             </>
           )}
