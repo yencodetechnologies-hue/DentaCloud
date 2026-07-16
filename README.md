@@ -37,7 +37,25 @@ MONGO_URI=mongodb+srv://<user>:<pass>@<cluster>/...   # or mongodb://127.0.0.1:2
 JWT_SECRET=...
 JWT_EXPIRES=7d
 CLIENT_ORIGIN=http://localhost:5173
+
+# AI Assistant — add GEMINI_API_KEY or OPENAI_API_KEY for ChatGPT/Gemini-style chat
+GEMINI_API_KEY=
+GEMINI_MODEL=gemini-2.0-flash
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-4o-mini
 ```
+
+## AI Assistant (optional)
+
+The floating 🤖 button opens a conversational assistant (like ChatGPT/Gemini).
+
+1. Add to `backend/.env`:
+   - `GEMINI_API_KEY` from [Google AI Studio](https://aistudio.google.com/apikey), **or**
+   - `OPENAI_API_KEY` from OpenAI
+2. Restart the backend (`npm run dev`)
+3. Open the assistant from the bottom-right icon on any page
+
+Without an API key, a built-in smart assistant still works with follow-up questions and confirmations.
 
 Notes:
 - If you change `PORT`, update the proxy `target` in `frontend/vite.config.js` to match (currently `http://localhost:1478`).

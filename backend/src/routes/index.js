@@ -9,6 +9,7 @@ import invoiceRoutes from "./invoices.js";
 import estimateRoutes from "./estimates.js";
 import uploadRoutes from "./uploads.js";
 import branchesRoutes from "./branches.js";
+import assistantRoutes from "./assistant.js";
 
 import Branch from "../models/Branch.js";
 import Enterprise from "../models/Enterprise.js";
@@ -42,6 +43,7 @@ router.use(resolveTenant);
 router.use("/dashboard", dashboardRoutes);
 router.use("/page-stats", pageStatsRoutes);
 router.use("/uploads", uploadRoutes);
+router.use("/assistant", assistantRoutes);
 
 router.use("/enterprises", authorize(...ADMIN_ONLY), resourceRouter(Enterprise, { searchFields: ["name", "code", "owner", "gstin"] }));
 router.use("/branches", branchesRoutes);

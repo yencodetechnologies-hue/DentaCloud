@@ -4,6 +4,7 @@ import { MENU } from "../config/menu.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import useUserBranch from "../hooks/useUserBranch.js";
 import ActiveBranchSelect from "./ActiveBranchSelect.jsx";
+import VoiceAssistant from "./VoiceAssistant.jsx";
 
 function initials(name = "") {
   return name.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
@@ -155,6 +156,7 @@ export default function Layout() {
         <main className="content">
           <Outlet />
         </main>
+        <VoiceAssistant />
       </div>
     </div>
   );
